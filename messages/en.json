@@ -1,0 +1,15 @@
+{
+  "Metadata": {
+    "title": "PURITY Fashion Studio",
+    "description": "Premium multilingual fashion studio for wardrobe, atelier, and image work."
+  },
+  "Home": {
+    "eyebrow": "Research. Imagine. Create.",
+    "headline": "Your perfect wardrobe starts with structure.",
+    "summary": "{serviceCount, plural, one {# service direction connects wardrobe strategy with studio execution.} other {# service directions connect wardrobe strategy with studio execution.}}",
+    "localeReady": "English experience",
+    "pillResearch": "Research",
+    "pillAtelier": "Atelier",
+    "pillSchool": "School"
+  }
+}

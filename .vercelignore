@@ -1,0 +1,16 @@
+.git
+.vercel
+.env*
+node_modules
+.next
+coverage
+playwright-report
+test-results
+tests
+docs
+public/media
+*.tsbuildinfo
+AGENTS.md
+.agents
+skills-lock.json
+RAW

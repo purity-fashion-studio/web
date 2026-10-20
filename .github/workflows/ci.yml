@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SITE_MODE: preview
+  EMAIL_MODE: disabled
+  PAYLOAD_DISABLE_BLOB_STORAGE: "true"
+  NEXT_PUBLIC_INDEXING_ENABLED: "false"
+  NEXT_PUBLIC_ANALYTICS_ENABLED: "false"
+
+jobs:
+  policy:
+    name: PR policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ ! "$PR_TITLE" =~ ^(feat|fix|perf|refactor|docs|test|build|ci|chore)(\([a-z0-9-]+\))?!?:\ .+ ]]; then
+            echo "Use Conventional Commits format for the PR title."
+            exit 1
+          fi
+
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: purity
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d purity"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_PAYLOAD_URL: http://localhost:3000
+      PAYLOAD_ENABLED: "true"
+      PAYLOAD_SECRET: ci-payload-secret-that-is-longer-than-thirty-two-characters
+      PREVIEW_SECRET: ci-preview-secret-that-is-longer-than-thirty-two-characters
+      CRON_SECRET: ci-cron-secret-that-is-longer-than-thirty-two-characters
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/purity
+      EMAIL_FROM: studio@example.com
+      ALLOW_CMS_SEED: "true"
+      PAYMENT_MODE: test
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.0
+        with:
+          version: 10.28.0
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Migrate and import Payload test data
+        run: |
+          pnpm payload:migrate
+          pnpm cms:bootstrap -- --target=local --confirm=BOOTSTRAP_LOCAL
+      - name: Verify payment concurrency and replay
+        run: pnpm test:integration
+      - name: Verify
+        run: pnpm qa:all
+
+  e2e:
+    name: E2E shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: purity
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d purity"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_PAYLOAD_URL: http://localhost:3000
+      PAYLOAD_ENABLED: "true"
+      PAYLOAD_SECRET: ci-payload-secret-that-is-longer-than-thirty-two-characters
+      PREVIEW_SECRET: ci-preview-secret-that-is-longer-than-thirty-two-characters
+      CRON_SECRET: ci-cron-secret-that-is-longer-than-thirty-two-characters
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/purity
+      EMAIL_FROM: studio@example.com
+      ALLOW_CMS_SEED: "true"
+      PAYMENT_MODE: test
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.0
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm payload:migrate
+      - run: pnpm cms:bootstrap -- --target=local --confirm=BOOTSTRAP_LOCAL
+      - run: pnpm build
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/2 --update-snapshots=none

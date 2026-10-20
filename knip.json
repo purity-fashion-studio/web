@@ -1,0 +1,11 @@
+{
+  "ignoreIssues": {
+    "components/ui/alert.tsx": ["exports"],
+    "components/ui/badge.tsx": ["exports"],
+    "components/ui/card.tsx": ["exports"],
+    "components/ui/empty.tsx": ["exports"],
+    "components/ui/field.tsx": ["exports"],
+    "components/ui/select.tsx": ["exports"],
+    "components/ui/sheet.tsx": ["exports"]
+  }
+}

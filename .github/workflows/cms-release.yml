@@ -1,0 +1,118 @@
+name: CMS release operation
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Reviewed commit SHA
+        required: true
+        type: string
+      target:
+        description: Environment
+        required: true
+        type: choice
+        options: [preview, production]
+      operation:
+        description: Operation
+        required: true
+        type: choice
+        options: [verify, migrate, bootstrap, restore, reset-preview]
+      confirmation:
+        description: Exact operation confirmation
+        required: true
+        type: string
+
+concurrency:
+  group: cms-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  cms:
+    environment: ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ALLOW_CMS_RESET: ${{ inputs.operation == 'reset-preview' && 'true' || 'false' }}
+      ALLOW_CMS_RESTORE: ${{ inputs.operation == 'restore' && 'true' || 'false' }}
+      ALLOW_CMS_SEED: ${{ contains(fromJSON('["bootstrap", "restore"]'), inputs.operation) && 'true' || 'false' }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      EMAIL_OVERRIDE_RECIPIENT: ${{ vars.EMAIL_OVERRIDE_RECIPIENT }}
+      EXPECTED_BLOB_STORE_ID: ${{ vars.EXPECTED_BLOB_STORE_ID }}
+      EXPECTED_DATABASE_HOST: ${{ vars.EXPECTED_DATABASE_HOST }}
+      EXPECTED_DATABASE_NAME: ${{ vars.EXPECTED_DATABASE_NAME }}
+      NEXT_PUBLIC_PAYLOAD_URL: ${{ vars.NEXT_PUBLIC_PAYLOAD_URL }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+      NEXT_PUBLIC_INDEXING_ENABLED: ${{ inputs.target == 'production' && vars.NEXT_PUBLIC_INDEXING_ENABLED || 'false' }}
+      NODE_ENV: ${{ inputs.target == 'production' && 'production' || 'development' }}
+      PAYLOAD_ENABLED: "true"
+      SITE_MODE: ${{ vars.SITE_MODE || 'production' }}
+      EMAIL_MODE: ${{ vars.EMAIL_MODE || 'resend' }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_DOMAIN_VERIFIED: ${{ vars.RESEND_DOMAIN_VERIFIED }}
+      PAYMENT_MODE: ${{ inputs.target == 'production' && vars.PAYMENT_MODE || 'test' }}
+      PAYMENT_MERCHANT_READY: ${{ vars.PAYMENT_MERCHANT_READY || 'false' }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      LIQPAY_PUBLIC_KEY: ${{ secrets.LIQPAY_PUBLIC_KEY }}
+      LIQPAY_PRIVATE_KEY: ${{ secrets.LIQPAY_PRIVATE_KEY }}
+      VERCEL_ENV: ${{ inputs.target }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      TARGET: ${{ inputs.target }}
+      OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.sha }}
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.0
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate and run
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = production ]; then
+            unset EMAIL_OVERRIDE_RECIPIENT
+          fi
+          pnpm env:check
+          pnpm release:check -- --target="$TARGET"
+          pnpm content:manifest:verify
+
+          case "$OPERATION" in
+            verify)
+              test "$CONFIRMATION" = "VERIFY_${TARGET^^}"
+              pnpm cms:verify -- --target="$TARGET"
+              pnpm cms:locales
+              ;;
+            migrate)
+              test "$CONFIRMATION" = "MIGRATE_${TARGET^^}"
+              pnpm payload:migrate
+              pnpm payload:migrate:status
+              ;;
+            bootstrap)
+              test "$CONFIRMATION" = "BOOTSTRAP_${TARGET^^}"
+              pnpm payload:migrate
+              pnpm cms:bootstrap -- --target="$TARGET" "--confirm=$CONFIRMATION"
+              pnpm cms:locales
+              ;;
+            restore)
+              test "$CONFIRMATION" = "RESTORE_${TARGET^^}"
+              pnpm payload:migrate
+              pnpm cms:restore -- --target="$TARGET" "--confirm=$CONFIRMATION" --force --refresh-media
+              pnpm cms:locales
+              ;;
+            reset-preview)
+              test "$TARGET" = preview
+              test "$CONFIRMATION" = RESET_PREVIEW
+              pnpm cms:reset-preview -- "--confirm=$CONFIRMATION"
+              ;;
+          esac
