@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vitest"
 
-import { isOfferCheckoutEligible } from "@/features/booking/offer-eligibility"
+import {
+  defaultOfferFormat,
+  isOfferCheckoutEligible,
+} from "@/features/booking/offer-eligibility"
 import type { Offer } from "@/payload-types"
 
 const now = Date.parse("2026-08-12T12:00:00.000Z")
+
+it.each([
+  ["studio", "studio"],
+  ["online", "online"],
+  ["remote-atelier", "atelier"],
+  ["in-person", "studio"],
+  ["hybrid", "studio"],
+] as const)(
+  "selects a compatible default for %s offers",
+  (format, expected) => {
+    expect(defaultOfferFormat({ format })).toBe(expected)
+  }
+)
 
 function offer(overrides: Partial<Offer> = {}) {
   return {

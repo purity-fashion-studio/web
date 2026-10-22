@@ -34,7 +34,12 @@ export function ShellLink({
   }
 
   return (
-    <Link href={href} className={linkClassName} aria-label={ariaLabel}>
+    <Link
+      href={href}
+      prefetch={false}
+      className={linkClassName}
+      aria-label={ariaLabel}
+    >
       {children}
     </Link>
   )

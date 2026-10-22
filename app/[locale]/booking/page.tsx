@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditorialSections } from "@/components/editorial-sections"
 import { notFound } from "next/navigation"
 
 import { SiteFooter, SiteHeader } from "@/components/cms-site-shell"
@@ -17,6 +18,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { BookingForm } from "@/features/booking/booking-form"
+import { resolveCart } from "@/features/cart/actions"
+import { cartSelectionSchema } from "@/features/cart/selection"
+import { getInterfaceCopy } from "@/i18n/messages"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { hasLocale, type Locale } from "@/i18n/routing"
 
 type BookingPageProps = {
@@ -24,6 +29,11 @@ type BookingPageProps = {
   searchParams?: Promise<{
     service?: string | string[]
     offer?: string | string[]
+    course?: string | string[]
+    collection?: string | string[]
+    format?: string | string[]
+    currency?: string | string[]
+    intent?: string | string[]
   }>
 }
 
@@ -48,6 +58,7 @@ export async function generateMetadata({
       path: "/booking",
       title: page.seo.title,
       description: page.seo.description,
+      image: page.seo.image,
     })),
     robots: { index: false, follow: false },
   }
@@ -78,17 +89,73 @@ export default async function BookingPage({
     typeof query?.service === "string" ? query.service : undefined
   const requestedOfferId =
     typeof query?.offer === "string" ? query.offer : undefined
+  const courseSlug =
+    typeof query?.course === "string" ? query.course : undefined
+  const collectionSlug =
+    typeof query?.collection === "string" ? query.collection : undefined
+  const requestedFormat =
+    typeof query?.format === "string" ? query.format : "studio"
+  const requestedCurrency =
+    typeof query?.currency === "string" ? query.currency : "EUR"
+  const targetService =
+    requestedServiceParam ??
+    (courseSlug
+      ? "wardrobe-management"
+      : collectionSlug
+        ? "capsule-collection"
+        : undefined)
   const visibleServices = await getPublishedServices(locale)
   const requestedService = visibleServices.find(
     (service) =>
-      service.slug === requestedServiceParam ||
-      service.routeSegment === requestedServiceParam
+      service.slug === targetService || service.routeSegment === targetService
   )
   const serviceOptions = visibleServices.map((service) => ({
     slug: service.slug,
     title: service.title,
   }))
   const initialServiceSlug = requestedService?.slug ?? serviceOptions[0]?.slug
+  const explicitSelection = Boolean(
+    requestedOfferId ||
+    courseSlug ||
+    collectionSlug ||
+    query?.format ||
+    query?.currency
+  )
+  const parsedSelection = cartSelectionSchema.safeParse({
+    kind: courseSlug ? "course" : collectionSlug ? "collection" : "service",
+    slug: courseSlug ?? collectionSlug ?? initialServiceSlug,
+    offerId: requestedOfferId,
+    format: requestedFormat,
+    currency: requestedCurrency,
+  })
+  const selection =
+    explicitSelection &&
+    parsedSelection.success &&
+    !(courseSlug && collectionSlug)
+      ? (await resolveCart(locale, [parsedSelection.data]))[0]
+      : undefined
+  const selectionUnavailable =
+    (explicitSelection && !selection?.available) ||
+    (Boolean(targetService) && !requestedService)
+  const currentQuery = new URLSearchParams()
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (
+      [
+        "service",
+        "offer",
+        "course",
+        "collection",
+        "format",
+        "currency",
+        "intent",
+      ].includes(key) &&
+      typeof value === "string"
+    )
+      currentQuery.set(key, value)
+  }
+  const currentPath = currentQuery.size
+    ? `/booking?${currentQuery}`
+    : "/booking"
   const mediaAsset = page.mediaAsset
   const body = page.sections.length
     ? page.sections.map((section) => section.body)
@@ -96,16 +163,9 @@ export default async function BookingPage({
 
   return (
     <div className="min-h-svh bg-background text-foreground">
-      <SiteHeader
-        locale={locale}
-        currentPath={
-          initialServiceSlug
-            ? `/booking?service=${initialServiceSlug}`
-            : "/booking"
-        }
-      />
+      <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={page.eyebrow ?? page.title}
@@ -141,26 +201,52 @@ export default async function BookingPage({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <BookingForm
-                  locale={locale}
-                  services={serviceOptions}
-                  initialServiceSlug={initialServiceSlug ?? ""}
-                  initialOfferId={requestedOfferId}
-                  copy={settings.booking}
-                />
+                {selectionUnavailable ? (
+                  <Alert>
+                    <AlertDescription>
+                      {
+                        getInterfaceCopy(locale).BookingMessages
+                          .selectionUnavailable
+                      }
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <BookingForm
+                    key={currentPath}
+                    locale={locale}
+                    services={serviceOptions}
+                    initialServiceSlug={initialServiceSlug ?? ""}
+                    initialOfferId={requestedOfferId}
+                    initialCourseSlug={courseSlug}
+                    initialCollectionSlug={collectionSlug}
+                    initialFormat={
+                      parsedSelection.success
+                        ? parsedSelection.data.format
+                        : undefined
+                    }
+                    initialCurrency={
+                      parsedSelection.success
+                        ? parsedSelection.data.currency
+                        : undefined
+                    }
+                    initialIntent={
+                      selection?.requiresQuote
+                        ? "request"
+                        : requestedOfferId
+                          ? "checkout"
+                          : "request"
+                    }
+                    selection={selection}
+                    copy={settings.booking}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
         </section>
+        <EditorialSections blocks={page.editorialBlocks} locale={locale} />
       </main>
-      <SiteFooter
-        locale={locale}
-        currentPath={
-          initialServiceSlug
-            ? `/booking?service=${initialServiceSlug}`
-            : "/booking"
-        }
-      />
+      <SiteFooter locale={locale} currentPath={currentPath} />
     </div>
   )
 }

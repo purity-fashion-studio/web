@@ -259,6 +259,8 @@ function LanguageSwitcher({
         <Link
           key={locale}
           href={localizePath(locale, currentPath)}
+          prefetch={false}
+          hrefLang={locale}
           aria-current={locale === currentLocale ? "page" : undefined}
           className={cn(
             "inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-xs text-muted-foreground uppercase hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",

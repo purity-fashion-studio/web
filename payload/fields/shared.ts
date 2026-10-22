@@ -21,6 +21,27 @@ export const publicRead: Access = ({ req }) => {
   return filter
 }
 
+export function publicReadWithDirection(
+  field: "primaryDirection" | "direction"
+): Access {
+  return async (args) => {
+    const filter = await publicRead(args)
+    if (typeof filter === "boolean") return filter
+    const directions = await args.req.payload.find({
+      collection: "directions",
+      depth: 0,
+      limit: 1000,
+      pagination: false,
+      overrideAccess: false,
+      req: args.req,
+      select: { slug: true },
+    })
+    return {
+      and: [filter, { [field]: { in: directions.docs.map(({ id }) => id) } }],
+    }
+  }
+}
+
 export function localizedText(
   name: string,
   label: string,

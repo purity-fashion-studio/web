@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { EditorialSections } from "@/components/editorial-sections"
 import { notFound } from "next/navigation"
 
 import { EditorialHero } from "@/components/purity"
@@ -62,7 +63,7 @@ async function PaymentStatusPage({
   return (
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath={currentPath} />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={page.eyebrow ?? detailLabels.provider}
@@ -102,6 +103,7 @@ async function PaymentStatusPage({
             {page.cta?.label ?? page.title}
           </Link>
         </EditorialHero>
+        <EditorialSections blocks={page.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>

@@ -54,10 +54,14 @@ import {
   paymentCurrencies,
   routePaymentProvider,
   type BookingInput,
+  type BookingFormat,
+  type PaymentCurrency,
   type BookingResult,
 } from "@/features/booking/schema"
 import type { Locale } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { getInterfaceCopy } from "@/i18n/messages"
+import type { ResolvedCartItem } from "@/features/cart/actions"
 
 type ServiceOption = {
   slug: string
@@ -69,6 +73,12 @@ type BookingFormProps = {
   services: ServiceOption[]
   initialServiceSlug: string
   initialOfferId?: string
+  initialCourseSlug?: string
+  initialCollectionSlug?: string
+  initialFormat?: BookingFormat
+  initialCurrency?: PaymentCurrency
+  initialIntent?: "request" | "checkout"
+  selection?: ResolvedCartItem
   copy: BookingPublicCopy
 }
 
@@ -133,6 +143,12 @@ function BookingForm({
   services,
   initialServiceSlug,
   initialOfferId,
+  initialCourseSlug,
+  initialCollectionSlug,
+  initialFormat,
+  initialCurrency,
+  initialIntent,
+  selection,
   copy,
 }: BookingFormProps) {
   const [submissionStartedAt, setSubmissionStartedAt] = useState(() =>
@@ -154,13 +170,16 @@ function BookingForm({
     defaultValues: {
       inquiryType: "private",
       serviceSlug: defaultService,
+      courseSlug: initialCourseSlug,
+      collectionSlug: initialCollectionSlug,
+      intent: initialIntent ?? (initialOfferId ? "checkout" : "request"),
       name: "",
       email: "",
       phone: "",
       company: "",
-      format: "studio",
+      format: initialFormat ?? "studio",
       contactMethod: "email",
-      budgetCurrency: "EUR",
+      budgetCurrency: initialCurrency ?? "EUR",
       preferredAt: "",
       message: "",
       consent: false,
@@ -252,17 +271,30 @@ function BookingForm({
         continue
       }
 
-      formData.set(key, String(value ?? ""))
+      formData.set(
+        key,
+        key === "preferredAt" && value
+          ? new Date(String(value)).toISOString()
+          : String(value ?? "")
+      )
     }
 
     startTransition(async () => {
-      const nextResult = await submitBooking(result, formData)
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          Math.max(0, 1250 - (Date.now() - submissionStartedAt))
+        )
+      )
+      const nextResult = await submitBooking(result, formData).catch(
+        () => ({ status: "error", message: "serviceUnavailable" }) as const
+      )
       if (nextResult.status === "success") {
-        // A successful response closes this idempotency window. Retries while
-        // the request is pending still reuse the same key; a later deliberate
-        // submit gets a fresh key and creates a new booking request.
-        setIdempotencyKey(crypto.randomUUID())
-        setSubmissionStartedAt(Date.now())
+        // An unavailable checkout retries the saved request, not a new order.
+        if (!nextResult.checkoutUnavailable) {
+          setIdempotencyKey(crypto.randomUUID())
+          setSubmissionStartedAt(Date.now())
+        }
         trackBookingEvent({
           event: "booking_submit",
           serviceSlug: values.serviceSlug,
@@ -308,7 +340,16 @@ function BookingForm({
           className="focus-visible:ring-2 focus-visible:ring-ring"
         >
           <AlertTitle>{copy.errorTitle}</AlertTitle>
-          <AlertDescription>{copy.validationError}</AlertDescription>
+          <AlertDescription>
+            {result.status === "error" &&
+            result.message in getInterfaceCopy(locale).BookingMessages
+              ? getInterfaceCopy(locale).BookingMessages[
+                  result.message as keyof ReturnType<
+                    typeof getInterfaceCopy
+                  >["BookingMessages"]
+                ]
+              : copy.validationError}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -321,7 +362,9 @@ function BookingForm({
         >
           <AlertTitle>{copy.successTitle}</AlertTitle>
           <AlertDescription>
-            {copy.successSummary}{" "}
+            {result.checkoutUnavailable
+              ? getInterfaceCopy(locale).BookingMessages.checkoutUnavailable
+              : copy.successSummary}{" "}
             {result.provider && result.currency
               ? `${copy.providers[result.provider]} / ${result.currency}`
               : ""}
@@ -460,6 +503,7 @@ function BookingForm({
                   value={field.value}
                   onValueChange={field.onChange}
                   items={serviceSelectItems}
+                  disabled={Boolean(selection)}
                 >
                   <SelectTrigger
                     aria-label={copy.labels.serviceSlug}
@@ -504,6 +548,7 @@ function BookingForm({
                   value={field.value}
                   onValueChange={field.onChange}
                   aria-labelledby={fieldId("format")}
+                  disabled={Boolean(selection)}
                   className="grid gap-3 sm:grid-cols-3"
                 >
                   {formats.map((format) => (
@@ -557,6 +602,7 @@ function BookingForm({
                     value={field.value}
                     onValueChange={field.onChange}
                     items={currencySelectItems}
+                    disabled={Boolean(selection)}
                   >
                     <SelectTrigger
                       aria-label={copy.labels.budgetCurrency}
@@ -594,7 +640,17 @@ function BookingForm({
             <Input
               id={fieldId("preferredAt")}
               type="datetime-local"
+              aria-invalid={Boolean(errorFor("preferredAt"))}
+              aria-describedby={
+                errorFor("preferredAt")
+                  ? fieldErrorId("preferredAt")
+                  : undefined
+              }
               {...form.register("preferredAt")}
+            />
+            <BookingFieldError
+              name="preferredAt"
+              message={errorFor("preferredAt")}
             />
           </Field>
 
@@ -645,6 +701,23 @@ function BookingForm({
       </FieldSet>
 
       <Card data-testid="booking-review">
+        {selection && (
+          <CardContent
+            data-testid="booking-selection"
+            className="grid gap-3 pt-6"
+          >
+            <p className="font-medium">{selection.title}</p>
+            {selection.offerTitle && <p>{selection.offerTitle}</p>}
+            {selection.price && (
+              <p>
+                {getInterfaceCopy(locale).Cart.price}: {selection.price}
+              </p>
+            )}
+            {selection.requiresQuote && (
+              <p>{getInterfaceCopy(locale).Cart.quote}</p>
+            )}
+          </CardContent>
+        )}
         <CardHeader>
           <CardTitle>{copy.reviewTitle}</CardTitle>
           <CardDescription>{copy.reviewSummary}</CardDescription>
@@ -692,7 +765,11 @@ function BookingForm({
         {isPending && (
           <Spinner aria-label={copy.submitting} data-icon="inline-start" />
         )}
-        {isPending ? copy.submitting : copy.submit}
+        {isPending
+          ? copy.submitting
+          : result.status === "success" && result.checkoutUnavailable
+            ? getInterfaceCopy(locale).BookingMessages.retryCheckout
+            : copy.submit}
       </Button>
     </form>
   )

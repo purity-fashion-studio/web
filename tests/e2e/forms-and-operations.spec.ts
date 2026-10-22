@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test"
+import { assertIsolatedTestDatabase } from "../../scripts/test-database"
 
 test("contact form validates and records inquiry-only requests", async ({
   page,
+  baseURL,
 }) => {
+  assertIsolatedTestDatabase(process.env, baseURL ?? "http://localhost:3000")
   await page.goto("/uk/contacts")
   await expect(
     page

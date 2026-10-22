@@ -1,4 +1,5 @@
 import type { MediaAsset } from "@/content/media"
+import type { EditorialBlock } from "@/content/editorial"
 import type { DirectionPageData, PublicPageData } from "@/content/public-api"
 
 export type PublicPagePresentation = {
@@ -19,6 +20,7 @@ export type CategoryPresentation = {
 }
 
 export type CategoryPagePresentation = {
+  editorialBlocks?: EditorialBlock[]
   ctaService: string
   heroNote: string
   processTitle: string
@@ -49,6 +51,7 @@ export function toCategoryPagePresentation(
 ): CategoryPagePresentation {
   return {
     ctaService: direction.ctaService,
+    editorialBlocks: direction.editorialBlocks,
     heroNote: direction.narrative,
     processTitle: direction.processTitle,
     processSteps: direction.process.map((step) => ({

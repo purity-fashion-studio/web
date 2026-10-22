@@ -19,7 +19,9 @@ async function policy(mode: "development" | "production") {
 it("permits the pinned Next development overlay stylesheet without permitting arbitrary inline styles", async () => {
   const csp = await policy("development")
   const styles = csp.split("; ").find((part) => part.startsWith("style-src "))!
-  expect(styles).toContain("'sha256-4GzqRlwcGp7cD3kANBs5f/CO/iqLwfJq0WYAq59xN6E='")
+  expect(styles).toContain(
+    "'sha256-4GzqRlwcGp7cD3kANBs5f/CO/iqLwfJq0WYAq59xN6E='"
+  )
   expect(styles).not.toContain("'unsafe-inline'")
   expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/)
 })
@@ -30,5 +32,7 @@ it("keeps production styles nonce-bound and scripts protected", async () => {
   expect(styles).toMatch(/^style-src 'self' 'nonce-[^']+'$/)
   expect(csp).not.toContain("sha256-")
   expect(csp).not.toContain("unsafe-eval")
-  expect(csp.split("; ").find((part) => part.startsWith("script-src "))).not.toContain("unsafe-inline")
+  expect(
+    csp.split("; ").find((part) => part.startsWith("script-src "))
+  ).not.toContain("unsafe-inline")
 })

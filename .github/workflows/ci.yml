@@ -17,6 +17,7 @@ env:
   SITE_MODE: preview
   EMAIL_MODE: disabled
   PAYLOAD_DISABLE_BLOB_STORAGE: "true"
+  PURITY_TEST_DATABASE: purity
   NEXT_PUBLIC_INDEXING_ENABLED: "false"
   NEXT_PUBLIC_ANALYTICS_ENABLED: "false"
 
@@ -141,4 +142,4 @@ jobs:
       - run: pnpm payload:migrate
       - run: pnpm cms:bootstrap -- --target=local --confirm=BOOTSTRAP_LOCAL
       - run: pnpm build
-      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/2 --update-snapshots=none
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/2 --workers=1 --update-snapshots=none

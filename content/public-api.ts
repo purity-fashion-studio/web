@@ -18,6 +18,8 @@ import type {
 } from "@/payload-types"
 import type { BookingPublicCopy } from "@/features/booking/public-copy"
 import type { MediaAsset } from "./media"
+import { contentCacheIdentity } from "./cache-identity"
+import { resolveEditorialBlocks, type EditorialBlock } from "./editorial"
 import type { Locale } from "../i18n/routing"
 
 export type ServiceOffer = Pick<
@@ -37,7 +39,10 @@ export type ServiceOffer = Pick<
   | "termsVersion"
 >
 
+type PublicSEO = { title: string; description: string; image?: MediaAsset }
+
 export type ServicePageData = {
+  editorialBlocks?: EditorialBlock[]
   id: string
   slug: string
   routeSegment: string
@@ -60,9 +65,7 @@ export type ServicePageData = {
   qualification?: string
   nextStepTitle: string
   nextStepSummary: string
-  contactLabel?: string
-  courseLabel?: string
-  collectionLabel?: string
+
   mediaAsset?: MediaAsset
   offers: ServiceOffer[]
   faq: Array<{ question: string; answer: string }>
@@ -70,13 +73,11 @@ export type ServicePageData = {
     action: PayloadService["cta"]["action"] | "booking-request"
     label: string
   }
-  seo: {
-    title: string
-    description: string
-  }
+  seo: PublicSEO
 }
 
 export type CoursePageData = {
+  editorialBlocks?: EditorialBlock[]
   id: string
   slug: string
   routeSegment: string
@@ -110,10 +111,11 @@ export type CoursePageData = {
   mediaAsset?: MediaAsset
   offers: ServiceOffer[]
   cta: PayloadCourse["cta"]
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 export type FashionCollectionPageData = {
+  editorialBlocks?: EditorialBlock[]
   id: string
   slug: string
   routeSegment: string
@@ -146,7 +148,7 @@ export type FashionCollectionPageData = {
   offers: ServiceOffer[]
   rightsAndCredits: string
   cta: PayloadFashionCollection["cta"]
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 export type PortfolioCasePageData = {
@@ -163,7 +165,7 @@ export type PortfolioCasePageData = {
   result: string
   hasBeforeAfter: boolean
   mediaAssets: MediaAsset[]
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 export type ServiceCardData = {
@@ -176,6 +178,7 @@ export type ServiceCardData = {
 }
 
 export type DirectionPageData = {
+  editorialBlocks?: EditorialBlock[]
   id: string
   slug: string
   routeSegment: string
@@ -209,10 +212,11 @@ export type DirectionPageData = {
   outcomes: string[]
   services: ServiceCardData[]
   mediaAsset?: MediaAsset
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 export type PublicPageData = {
+  editorialBlocks?: EditorialBlock[]
   id: string
   slug: string
   routeSegment: string
@@ -257,7 +261,7 @@ export type PublicPageData = {
   contentsTitle?: string
   effectiveDateLabel?: string
   effectiveDate?: string
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 export type HeaderData = {
@@ -362,7 +366,7 @@ export type HomeData = {
   selectedCourseSlugs: string[]
   selectedCollectionSlugs: string[]
   selectedPortfolioSlugs: string[]
-  seo: { title: string; description: string }
+  seo: PublicSEO
 }
 
 const getPayloadClient = cache(() => getPayload({ config }))
@@ -370,11 +374,12 @@ const getPayloadClient = cache(() => getPayload({ config }))
 // Namespace persistent public reads by deployment so cached drafts or missing
 // documents cannot mask current published content. Local runtimes use a stable
 // namespace and the same content-change invalidation hooks.
-const payloadCacheNamespace = `purity-payload-cache-v3:${
-  process.env.VERCEL_DEPLOYMENT_ID ??
-  process.env.VERCEL_GIT_COMMIT_SHA ??
-  "local"
-}`
+const payloadCacheNamespace = contentCacheIdentity({
+  deploymentKey:
+    process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA,
+  databaseURL: process.env.DATABASE_URL,
+  localMedia: process.env.PAYLOAD_DISABLE_BLOB_STORAGE === "true",
+})
 
 function safeExternalURL(value: string | null | undefined) {
   if (!value || /[\u0000-\u001f\u007f]/.test(value)) return undefined
@@ -403,15 +408,7 @@ async function getPayloadAccess(draft: boolean) {
   }
 }
 
-function getPublicMediaURL(value: string, filename?: string | null): string {
-  // Payload's built-in local adapter writes upload variants to public/media in
-  // CI and local development. The application still reads the media document
-  // and its filename from Payload; this only selects the local adapter's
-  // public delivery path when Blob storage is explicitly disabled.
-  if (process.env.PAYLOAD_DISABLE_BLOB_STORAGE === "true" && filename) {
-    return `/media/${encodeURIComponent(filename)}`
-  }
-
+function getPublicMediaURL(value: string): string {
   try {
     const url = new URL(value)
 
@@ -460,7 +457,7 @@ function payloadMediaToView(
     fileName: media.filename ?? media.id,
     aspectRatio:
       media.width && media.height ? `${media.width}/${media.height}` : "4/3",
-    src: getPublicMediaURL(src, preferredSize?.filename ?? media.filename),
+    src: getPublicMediaURL(src),
     heroFocalPoint: focalX < 34 ? "left" : focalX > 66 ? "right" : "center",
     usage: media.allowedUsageContexts ?? [],
     internalLabel,
@@ -516,7 +513,8 @@ function relationshipIDs(value: unknown): string[] {
 async function findReadableMediaMap(
   locale: Locale,
   ids: string[],
-  draft: boolean
+  draft: boolean,
+  proofOnly = false
 ) {
   const mediaByID = new Map<string, MediaAsset | undefined>()
   if (!ids.length) return mediaByID
@@ -536,9 +534,39 @@ async function findReadableMediaMap(
   })
 
   for (const media of result.docs) {
-    mediaByID.set(media.id, payloadMediaToView(media as Media, locale))
+    mediaByID.set(
+      media.id,
+      proofOnly &&
+        !draft &&
+        (media.source !== "client" || !media.isRealClientProof)
+        ? undefined
+        : payloadMediaToView(media as Media, locale)
+    )
   }
   return mediaByID
+}
+
+async function findSEOImage(value: unknown, locale: Locale, draft: boolean) {
+  const id = relationshipID(value)
+  return id
+    ? (await findReadableMediaMap(locale, [id], draft)).get(id)
+    : undefined
+}
+
+async function findEditorialBlocks(
+  blocks: PayloadService["supplementaryLayout"],
+  locale: Locale,
+  draft: boolean
+) {
+  if (!blocks?.length) return []
+  return resolveEditorialBlocks({
+    blocks,
+    locale,
+    draft,
+    payload: await getPayloadClient(),
+    access: await getPayloadAccess(draft),
+    readMedia: (ids) => findReadableMediaMap(locale, ids, draft),
+  })
 }
 
 function orderByRelationship<T extends { id: string }>(
@@ -627,6 +655,7 @@ async function findPayloadService(
       outcomes: true,
       timingNote: true,
       qualification: true,
+      supplementaryLayout: true,
       gallery: true,
       faq: true,
       cta: true,
@@ -638,12 +667,10 @@ async function findPayloadService(
   if (!service) return null
 
   const [directionResult, mediaResult, offersResult] = await Promise.all([
-    payload.findByID({
+    payload.find({
       collection: "directions",
-      id:
-        typeof service.primaryDirection === "string"
-          ? service.primaryDirection
-          : service.primaryDirection.id,
+      where: { id: { equals: relationshipID(service.primaryDirection) } },
+      limit: 1,
       depth: 0,
       draft,
       fallbackLocale: false,
@@ -693,6 +720,8 @@ async function findPayloadService(
     }),
   ])
 
+  const direction = directionResult.docs[0]
+  if (!direction) return null
   const media = orderByRelationship(mediaResult.docs, service.gallery)[0]
   const formats = service.formatPresentation ?? []
   const outcomes = service.outcomes?.map((item) => item.text) ?? []
@@ -702,7 +731,7 @@ async function findPayloadService(
     id: service.id,
     slug: service.slug,
     routeSegment: service.slug,
-    eyebrow: directionResult.title,
+    eyebrow: direction.title,
     title: service.title,
     summary: service.summary,
     intro: service.intro,
@@ -729,6 +758,11 @@ async function findPayloadService(
     nextStepSummary: service.nextStepSummary,
     mediaAsset: media ? payloadMediaToView(media as Media, locale) : undefined,
     offers,
+    editorialBlocks: await findEditorialBlocks(
+      service.supplementaryLayout,
+      locale,
+      draft
+    ),
     faq:
       service.faq?.map((item) => ({
         question: item.question,
@@ -738,6 +772,7 @@ async function findPayloadService(
     seo: {
       title: service.meta?.title || `${service.title} | PURITY Fashion Studio`,
       description: service.meta?.description || service.summary,
+      image: await findSEOImage(service.meta?.image, locale, draft),
     },
   }
 }
@@ -748,7 +783,13 @@ function cachedPayloadService(locale: Locale, slug: string) {
     [payloadCacheNamespace, "cms", "service", locale, slug],
     {
       revalidate: 60,
-      tags: ["cms:services", "cms:offers", "cms:media", `cms:services:${slug}`],
+      tags: [
+        "cms:editorial",
+        "cms:services",
+        "cms:offers",
+        "cms:media",
+        `cms:services:${slug}`,
+      ],
     }
   )()
 }
@@ -822,6 +863,7 @@ async function findPayloadCourse(
       instructor: true,
       credentials: true,
       intakeNote: true,
+      supplementaryLayout: true,
       media: true,
       availability: true,
       cta: true,
@@ -920,9 +962,15 @@ async function findPayloadCourse(
     mediaAsset: media ? payloadMediaToView(media as Media, locale) : undefined,
     offers: offersResult.docs as ServiceOffer[],
     cta: course.cta,
+    editorialBlocks: await findEditorialBlocks(
+      course.supplementaryLayout,
+      locale,
+      draft
+    ),
     seo: {
       title: course.meta?.title || `${course.title} | PURITY Fashion Studio`,
       description: course.meta?.description || course.summary,
+      image: await findSEOImage(course.meta?.image, locale, draft),
     },
   }
 }
@@ -933,7 +981,13 @@ function cachedPayloadCourse(locale: Locale, slug: string) {
     [payloadCacheNamespace, "cms", "course", locale, slug],
     {
       revalidate: 60,
-      tags: ["cms:courses", "cms:offers", "cms:media", `cms:courses:${slug}`],
+      tags: [
+        "cms:editorial",
+        "cms:courses",
+        "cms:offers",
+        "cms:media",
+        `cms:courses:${slug}`,
+      ],
     }
   )()
 }
@@ -1022,9 +1076,7 @@ async function findPublishedPayloadCourseCards(
   const activeCourseIDs = new Set(
     offersResult.docs.flatMap((offer) => {
       const courseID = relationshipID(offer.course)
-      return offer.commercialStatus === "active" && courseID
-        ? [courseID]
-        : []
+      return offer.commercialStatus === "active" && courseID ? [courseID] : []
     })
   )
 
@@ -1091,23 +1143,6 @@ async function findPayloadFashionCollection(
       availabilityTitle: true,
       ctaTitle: true,
       ctaSummary: true,
-      formTitle: true,
-      formSummary: true,
-      heroMediaLabel: true,
-      standardsTitle: true,
-      standards: true,
-      recordTitle: true,
-      recordSummary: true,
-      recordItems: true,
-      currentTitle: true,
-      currentItems: true,
-      flowTitle: true,
-      flowItems: true,
-      secondaryCTALabel: true,
-      emptyEyebrow: true,
-      emptyTitle: true,
-      emptySummary: true,
-      emptyAction: true,
       serviceLabel: true,
       collectionType: true,
       collaborationCredits: true,
@@ -1118,6 +1153,7 @@ async function findPayloadFashionCollection(
       gallery: true,
       availability: true,
       rightsAndCredits: true,
+      supplementaryLayout: true,
       cta: true,
       meta: true,
     },
@@ -1219,10 +1255,16 @@ async function findPayloadFashionCollection(
     offers: offersResult.docs as ServiceOffer[],
     rightsAndCredits: collection.rightsAndCredits,
     cta: collection.cta,
+    editorialBlocks: await findEditorialBlocks(
+      collection.supplementaryLayout,
+      locale,
+      draft
+    ),
     seo: {
       title:
         collection.meta?.title || `${collection.title} | PURITY Fashion Studio`,
       description: collection.meta?.description || collection.summary,
+      image: await findSEOImage(collection.meta?.image, locale, draft),
     },
   }
 }
@@ -1237,6 +1279,7 @@ function cachedPayloadFashionCollection(locale: Locale, slug: string) {
         "cms:fashion-collections",
         "cms:offers",
         "cms:media",
+        "cms:editorial",
         `cms:fashion-collections:${slug}`,
       ],
     }
@@ -1361,9 +1404,7 @@ async function findPublishedPayloadFashionCollectionCards(
       summary: collection.summary,
       materials:
         collection.materials?.map((material) => material.material) ?? [],
-      commercialStatus: offers?.active
-        ? "active"
-        : collection.availability,
+      commercialStatus: offers?.active ? "active" : collection.availability,
       priceNote: offers?.labels.length
         ? offers.labels.join(" · ")
         : collection.availability,
@@ -1437,10 +1478,16 @@ async function findPayloadPortfolioCase(
   const mediaByID = new Map(
     mediaResult.docs.map((media) => [
       media.id,
-      payloadMediaToView(media as Media, locale),
+      !draft && (media.source !== "client" || !media.isRealClientProof)
+        ? undefined
+        : payloadMediaToView(media as Media, locale),
     ])
   )
 
+  const proofAssets = portfolioCase.media
+    .map((id) => mediaByID.get(typeof id === "string" ? id : id.id))
+    .filter((asset): asset is MediaAsset => Boolean(asset))
+  if (!draft && !proofAssets.length) return null
   return {
     id: portfolioCase.id,
     slug: portfolioCase.slug,
@@ -1454,10 +1501,9 @@ async function findPayloadPortfolioCase(
     process: portfolioCase.process,
     result: portfolioCase.result,
     hasBeforeAfter: portfolioCase.hasBeforeAfter,
-    mediaAssets: portfolioCase.media
-      .map((id) => mediaByID.get(typeof id === "string" ? id : id.id))
-      .filter((asset): asset is MediaAsset => Boolean(asset)),
+    mediaAssets: proofAssets,
     seo: {
+      image: await findSEOImage(portfolioCase.meta?.image, locale, draft),
       title:
         portfolioCase.meta?.title ||
         `${portfolioCase.title} | PURITY Fashion Studio`,
@@ -1518,9 +1564,9 @@ async function findPublishedPayloadPortfolioCases(locale: Locale) {
       )
     ),
   ]
-  const mediaByID = await findReadableMediaMap(locale, mediaIDs, false)
+  const mediaByID = await findReadableMediaMap(locale, mediaIDs, false, true)
 
-  return result.docs.map((portfolioCase) => ({
+  const cases = result.docs.map((portfolioCase) => ({
     id: portfolioCase.id,
     slug: portfolioCase.slug,
     routeSegment: portfolioCase.slug,
@@ -1543,6 +1589,7 @@ async function findPublishedPayloadPortfolioCases(locale: Locale) {
       description: portfolioCase.meta?.description || portfolioCase.summary,
     },
   })) satisfies PortfolioCasePageData[]
+  return cases.filter((portfolioCase) => portfolioCase.mediaAssets.length > 0)
 }
 
 export async function getPublishedPortfolioCases(locale: Locale) {
@@ -1610,7 +1657,6 @@ type HomeCourseSelection = {
 type HomeCollectionSelection = {
   routeSegment: string
   title: string
-  priceNote: string
   mediaAsset?: MediaAsset
 }
 
@@ -1795,57 +1841,18 @@ async function findHomeCollectionSelections(
     },
     where: { slug: { in: slugs } },
   })
-  const collectionIDs = result.docs.map((collection) => collection.id)
   const mediaIDs = [
     ...new Set(
       result.docs.flatMap((collection) => relationshipIDs(collection.gallery))
     ),
   ]
-  const [offersResult, mediaByID] = await Promise.all([
-    collectionIDs.length
-      ? payload.find({
-          collection: "offers",
-          depth: 0,
-          draft,
-          fallbackLocale: false,
-          limit: 1000,
-          locale,
-          ...access,
-          pagination: false,
-          select: {
-            fashionCollection: true,
-            title: true,
-            pricingMode: true,
-          },
-          where: { fashionCollection: { in: collectionIDs } },
-        })
-      : Promise.resolve({ docs: [] }),
-    findReadableMediaMap(locale, mediaIDs, draft),
-  ])
-  const offersByCollectionID = new Map<
-    string,
-    Array<{ title: string; pricingMode: string }>
-  >()
-  for (const offer of offersResult.docs) {
-    const collectionID = relationshipID(offer.fashionCollection)
-    if (!collectionID) continue
-    const offers = offersByCollectionID.get(collectionID) ?? []
-    offers.push({ title: offer.title, pricingMode: offer.pricingMode })
-    offersByCollectionID.set(collectionID, offers)
-  }
+  const mediaByID = await findReadableMediaMap(locale, mediaIDs, draft)
 
   return selectInRelationshipOrder(result.docs, slugs).map((collection) => {
     const firstMediaID = relationshipIDs(collection.gallery)[0]
-    const offers = offersByCollectionID.get(collection.id) ?? []
     return {
       routeSegment: collection.slug,
       title: collection.title,
-      priceNote:
-        offers.length > 0
-          ? offers
-              .map((offer) => `${offer.title}: ${offer.pricingMode}`)
-              .join(" · ")
-          : collection.availability,
       mediaAsset: firstMediaID ? mediaByID.get(firstMediaID) : undefined,
     }
   })
@@ -1940,9 +1947,11 @@ async function findPayloadServiceCards({
   locale: Locale
   slugs?: string[]
 }): Promise<ServiceCardData[]> {
+  if ((ids && !ids.length) || (slugs && !slugs.length)) return []
   const payload = await getPayloadClient()
   const and = []
   if (ids?.length) and.push({ id: { in: ids } })
+  if (slugs?.length) and.push({ slug: { in: slugs } })
   const result = await payload.find({
     collection: "services",
     depth: 0,
@@ -2072,6 +2081,7 @@ async function findPayloadDirection(
       outcomes: true,
       relatedServices: true,
       meta: true,
+      supplementaryLayout: true,
     },
     where: { [field]: { equals: value } },
   })
@@ -2098,20 +2108,25 @@ async function findPayloadDirection(
   return toDirectionPageData(
     direction as unknown as PayloadDirection,
     services,
-    mediaAsset
+    mediaAsset,
+    await findSEOImage(direction.meta?.image, locale, draft),
+    await findEditorialBlocks(direction.supplementaryLayout, locale, draft)
   )
 }
 
 function toDirectionPageData(
   direction: PayloadDirection,
   services: ServiceCardData[],
-  mediaAsset?: MediaAsset
+  mediaAsset?: MediaAsset,
+  seoImage?: MediaAsset,
+  editorialBlocks?: EditorialBlock[]
 ): DirectionPageData {
   return {
     id: direction.id,
     slug: direction.slug,
     routeSegment: direction.slug,
     canonicalKey: direction.canonicalKey,
+    editorialBlocks,
     title: direction.title,
     summary: direction.summary,
     eyebrow: direction.eyebrow ?? undefined,
@@ -2149,6 +2164,7 @@ function toDirectionPageData(
       title:
         direction.meta?.title || `${direction.title} | PURITY Fashion Studio`,
       description: direction.meta?.description || direction.summary,
+      image: seoImage,
     },
   }
 }
@@ -2165,6 +2181,7 @@ export async function getDirectionBySlug(locale: Locale, slug: string) {
         "cms:directions",
         "cms:services",
         "cms:media",
+        "cms:editorial",
         `cms:directions:${slug}`,
       ],
     }
@@ -2189,6 +2206,7 @@ export async function getDirectionByCanonicalKey(
         "cms:directions",
         "cms:services",
         "cms:media",
+        "cms:editorial",
         `cms:directions:canonical:${canonicalKey}`,
       ],
     }
@@ -2332,6 +2350,7 @@ async function findPayloadPage(
       id: true,
       slug: true,
       pageType: true,
+      layout: true,
       title: true,
       summary: true,
       eyebrow: true,
@@ -2409,6 +2428,7 @@ async function findPayloadPage(
     summary: page.summary,
     eyebrow: page.eyebrow ?? undefined,
     body: page.body,
+    editorialBlocks: await findEditorialBlocks(page.layout, locale, draft),
     studioSignals: page.studioSignals ?? [],
     methodEyebrow: page.methodEyebrow ?? undefined,
     methodTitle: page.methodTitle ?? undefined,
@@ -2457,6 +2477,7 @@ async function findPayloadPage(
     seo: {
       title: page.meta?.title || `${page.title} | PURITY Fashion Studio`,
       description: page.meta?.description || page.summary,
+      image: await findSEOImage(page.meta?.image, locale, draft),
     },
   }
 }
@@ -2469,7 +2490,7 @@ export async function getPageBySlug(locale: Locale, slug: string) {
     [payloadCacheNamespace, "cms", "page", locale, slug],
     {
       revalidate: 60,
-      tags: ["cms:pages", "cms:media", `cms:pages:${slug}`],
+      tags: ["cms:editorial", "cms:pages", "cms:media", `cms:pages:${slug}`],
     }
   )()
 }
@@ -2752,6 +2773,7 @@ async function findPayloadHome(locale: Locale, draft: boolean) {
     seo: {
       title: home.meta?.title || home.heroTitle,
       description: home.meta?.description || home.heroSummary,
+      image: await findSEOImage(home.meta?.image, locale, draft),
     },
   } satisfies HomeData
 }

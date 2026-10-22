@@ -146,7 +146,13 @@ export default buildConfig({
     idType: "uuid",
     migrationDir: path.resolve(dirname, "payload/migrations"),
     pool: { connectionString: databaseURL },
-    push: env.NODE_ENV === "development",
+    push:
+      env.NODE_ENV === "development" &&
+      process.env.CI !== "true" &&
+      env.VERCEL_ENV === undefined &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(
+        new URL(databaseURL).hostname
+      ),
   }),
   editor: lexicalEditor(),
   email:
@@ -258,6 +264,10 @@ export default buildConfig({
     safeFileNames: true,
   },
   typescript: {
+    autoGenerate:
+      env.NODE_ENV === "development" &&
+      process.env.CI !== "true" &&
+      env.VERCEL_ENV === undefined,
     outputFile: path.resolve(dirname, "payload-types.ts"),
   },
 })

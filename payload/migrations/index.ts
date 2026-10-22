@@ -15,6 +15,7 @@ import * as migration_20260718_163852_payment_reliability from "./20260718_16385
 import * as migration_20260718_170449 from "./20260718_170449"
 import * as migration_20261020_001500_auth_reset_request_time from "./20261020_001500_auth_reset_request_time"
 import * as migration_20261020_002200_media_object_key from "./20261020_002200_media_object_key"
+import * as migration_20261022_023000_booking_submission_snapshot from "./20261022_023000_booking_submission_snapshot"
 
 export const migrations = [
   {
@@ -101,5 +102,10 @@ export const migrations = [
     up: migration_20261020_002200_media_object_key.up,
     down: migration_20261020_002200_media_object_key.down,
     name: "20261020_002200_media_object_key",
+  },
+  {
+    up: migration_20261022_023000_booking_submission_snapshot.up,
+    down: migration_20261022_023000_booking_submission_snapshot.down,
+    name: "20261022_023000_booking_submission_snapshot",
   },
 ]

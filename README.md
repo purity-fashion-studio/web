@@ -5,7 +5,8 @@
 Multilingual product platform for PURITY Fashion Studio, built with Next.js,
 Payload CMS, PostgreSQL, TypeScript, Tailwind CSS and shadcn/ui. It includes
 managed content, leads/request booking, transactional email, Stripe/LiqPay
-checkout adapters and signed webhooks.
+checkout adapters and signed webhooks. A localized persistent cart retains
+service, course and collection selections for individual requests or checkout.
 
 ## Design system
 
@@ -94,6 +95,26 @@ See `docs/launch-handoff.md` for deployment prerequisites and
 
 ## Commands
 
+Database integration tests require an explicitly isolated local database:
+`PURITY_TEST_DATABASE` must equal the exact database name in `DATABASE_URL`.
+Email must be disabled or offline, payments must be in test mode, and Blob
+storage must be disabled. The integration guard rejects remote destinations
+and connection-string overrides. Run migrations and bootstrap the dedicated
+test database first; never point integration tests at business data.
+
+Mutating browser cases use the same isolation guard and Playwright's own local
+server. Leave `PLAYWRIGHT_BASE_URL` unset for those cases; an existing server or
+remote URL is not an isolated test target. Read-only route checks can still use
+an explicitly configured verification URL.
+
+Local filesystem uploads live in the ignored `.payload-media` directory and
+are delivered through Payload's access-controlled file route. They are not
+Next public assets: uploads must become readable without restarting the server,
+and unpublished/restricted media must not bypass collection access controls.
+When updating an existing local environment, preserve its upload files in this
+directory before restarting. Deployed Blob storage remains separate; do not
+upload private documents or unapproved client material to public Blob storage.
+
 | Command                    | Purpose                                                             |
 | -------------------------- | ------------------------------------------------------------------- |
 | `pnpm dev`                 | Start the development server                                        |
@@ -105,6 +126,7 @@ See `docs/launch-handoff.md` for deployment prerequisites and
 | `pnpm cms:check`           | Validate the actual Payload config and import fixtures              |
 | `pnpm payment:check`       | Verify provider routing and payment state transitions               |
 | `pnpm payment:integration` | Verify payment concurrency/replay against PostgreSQL                |
+| `pnpm test:integration`    | Verify CMS roles/lifecycle/media, bookings and payment concurrency  |
 | `pnpm readiness:mvp`       | Run types, lint, content, i18n and design-system checks             |
 | `pnpm test:e2e`            | Build and run Playwright route and interaction tests                |
 | `pnpm qa:all`              | Run the local static, Knip, dependency, unit, build and budget gate |
@@ -117,6 +139,7 @@ See `docs/launch-handoff.md` for deployment prerequisites and
 - `content/` — typed public Local API query layer and migration fixtures.
 - `payload/` — collections, globals, access, hooks, migrations and seed import.
 - `features/booking/` — leads, booking, payments and status contracts.
+- `features/cart/` — validated browser selections and server-side commerce resolution.
 - `messages/` — localized interface copy.
 - `tests/e2e/` — route, interaction, accessibility and visual coverage.
 - `docs/` — launch, QA and CMS handoff documentation.

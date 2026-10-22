@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
-import Link from "next/link"
+import { EditorialSections } from "@/components/editorial-sections"
+
 import { notFound } from "next/navigation"
 
 import { EditorialFaq, EditorialHero, FeatureList } from "@/components/purity"
-import { PreviewBanner } from "@/components/preview-banner"
+
 import { SiteFooter, SiteHeader } from "@/components/cms-site-shell"
-import { buttonVariants } from "@/components/ui/button"
+
 import {
   Card,
   CardContent,
@@ -20,10 +21,11 @@ import {
   getSiteSettings,
   type ServicePageData,
 } from "@/content/public-api"
-import { collectionPath, coursePath, servicePath } from "@/content/routes"
+import { servicePath } from "@/content/routes"
 import { BookingStartCta } from "@/features/booking/booking-start-cta"
+import { ProductCartControls } from "@/features/cart/product-cart-controls"
+import { defaultOfferFormat } from "@/features/booking/offer-eligibility"
 import { hasLocale, localizePath, type Locale } from "@/i18n/routing"
-import { cn } from "@/lib/utils"
 
 const faqTitles = {
   uk: "Поширені запитання",
@@ -57,6 +59,7 @@ export async function generateMetadata({
     path: servicePath(service.routeSegment),
     title: service.seo.title,
     description: service.seo.description,
+    image: service.seo.image,
   })
 }
 
@@ -77,10 +80,9 @@ function ServiceDetailPage({
 
   return (
     <div className="min-h-svh bg-background text-foreground">
-      <PreviewBanner locale={locale} />
       <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={service.eyebrow}
@@ -109,51 +111,15 @@ function ServiceDetailPage({
               serviceSlug={service.slug}
               variant="secondary"
             />
-            {service.contactLabel && (
-              <Link
-                href={localizePath(locale, "/contacts")}
-                className={cn(
-                  buttonVariants({
-                    variant: "outline",
-                    size: "lg",
-                    className: "h-auto min-h-11 max-w-full whitespace-normal",
-                  })
-                )}
-              >
-                {service.contactLabel}
-              </Link>
-            )}
-            {service.courseLabel && (
-              <Link
-                href={localizePath(
-                  locale,
-                  coursePath("wardrobe-management-course")
-                )}
-                className={cn(
-                  buttonVariants({
-                    variant: "outline",
-                    size: "lg",
-                    className: "h-auto min-h-11 max-w-full whitespace-normal",
-                  })
-                )}
-              >
-                {service.courseLabel}
-              </Link>
-            )}
-            {service.collectionLabel && (
-              <Link
-                href={localizePath(locale, collectionPath("purity-capsule"))}
-                className={cn(
-                  buttonVariants({
-                    variant: "outline",
-                    size: "lg",
-                    className: "h-auto min-h-11 max-w-full whitespace-normal",
-                  })
-                )}
-              >
-                {service.collectionLabel}
-              </Link>
-            )}
+            <ProductCartControls
+              locale={locale}
+              selection={{
+                kind: "service",
+                slug: service.slug,
+                format: "studio",
+                currency: "EUR",
+              }}
+            />
           </div>
         </EditorialHero>
 
@@ -277,10 +243,20 @@ function ServiceDetailPage({
                       <BookingStartCta
                         href={localizePath(
                           locale,
-                          `/booking?service=${service.routeSegment}&offer=${offer.id}`
+                          `/booking?service=${service.routeSegment}&offer=${offer.id}&format=${defaultOfferFormat(offer)}`
                         )}
                         label={service.cta.label}
                         serviceSlug={service.slug}
+                      />
+                      <ProductCartControls
+                        locale={locale}
+                        selection={{
+                          kind: "service",
+                          slug: service.slug,
+                          offerId: offer.id,
+                          format: defaultOfferFormat(offer),
+                          currency: "EUR",
+                        }}
                       />
                     </CardContent>
                   </Card>
@@ -316,6 +292,7 @@ function ServiceDetailPage({
             )}
           />
         )}
+        <EditorialSections blocks={service.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>

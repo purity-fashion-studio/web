@@ -6,6 +6,8 @@ import type * as React from "react"
 
 import "../globals.css"
 import { Analytics } from "@/components/analytics"
+import { PreviewBanner } from "@/components/preview-banner"
+import { SkipLink } from "@/components/skip-link"
 import { StructuredData } from "@/components/structured-data"
 import { getLocalizedMetadata } from "@/content/metadata"
 import { getHome, getSiteSettings } from "@/content/public-api"
@@ -59,6 +61,7 @@ export async function generateMetadata({
     locale,
     title: home.seo.title,
     description: home.seo.description,
+    image: home.seo.image,
   })
 
   return {
@@ -94,12 +97,7 @@ export default async function LocaleLayout({
       )}
     >
       <body>
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:bg-background focus:px-4 focus:py-3 focus:text-foreground focus:ring-2 focus:ring-ring"
-        >
-          {skipToContentLabels[locale]}
-        </a>
+        <SkipLink label={skipToContentLabels[locale]} />
         <StructuredData
           nonce={nonce}
           data={[
@@ -120,9 +118,8 @@ export default async function LocaleLayout({
             },
           ]}
         />
-        <div id="main-content" tabIndex={-1}>
-          {children}
-        </div>
+        <PreviewBanner locale={locale} />
+        {children}
         <Analytics nonce={nonce} />
       </body>
     </html>

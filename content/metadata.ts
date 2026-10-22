@@ -5,6 +5,7 @@ import { env } from "@/lib/env"
 import { getSiteURL } from "@/lib/site-url"
 
 import { locales, localizePath, type Locale } from "../i18n/routing"
+import type { MediaAsset } from "./media"
 
 function localizedAlternates(locale: Locale, path = "/") {
   return {
@@ -23,11 +24,13 @@ export async function getLocalizedMetadata({
   path = "/",
   title,
   description,
+  image,
 }: {
   locale: Locale
   path?: string
   title: string
   description: string
+  image?: Pick<MediaAsset, "src" | "alt">
 }): Promise<Metadata> {
   const preview = (await draftMode()).isEnabled
   const indexable = env.NEXT_PUBLIC_INDEXING_ENABLED === "true" && !preview
@@ -50,20 +53,15 @@ export async function getLocalizedMetadata({
       alternateLocale: locales.filter(
         (alternateLocale) => alternateLocale !== locale
       ),
-      images: [
-        {
-          url: "/brand/logo-og.png",
-          width: 1200,
-          height: 630,
-          alt: title,
-        },
-      ],
+      images: image?.src
+        ? [{ url: image.src, alt: image.alt[locale] }]
+        : [{ url: "/brand/logo-og.png", width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/brand/logo-og.png"],
+      images: [image?.src ?? "/brand/logo-og.png"],
     },
   }
 }

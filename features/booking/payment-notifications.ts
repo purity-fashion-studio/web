@@ -1,10 +1,11 @@
 import type { Payload, PayloadRequest } from "payload"
 
-import { env } from "@/lib/env"
 import { hasLocale } from "@/i18n/routing"
 
 import { paymentStatusEmail } from "./email-copy"
 import type { OutboxMessage } from "./notification-outbox"
+import { internalNotificationMessages } from "./notification-recipients"
+import { readSubmissionSnapshot } from "./submission-snapshot"
 
 export async function paymentNotificationMessages({
   payload,
@@ -32,10 +33,12 @@ export async function paymentNotificationMessages({
     depth: 0,
     overrideAccess: true,
     req,
-    select: { lead: true },
+    select: { lead: true, submissionSnapshot: true },
   })
+  const snapshot = readSubmissionSnapshot(booking.submissionSnapshot)
   const lead =
-    typeof booking.lead === "string"
+    snapshot ??
+    (typeof booking.lead === "string"
       ? await payload.findByID({
           collection: "leads",
           id: booking.lead,
@@ -44,7 +47,7 @@ export async function paymentNotificationMessages({
           req,
           select: { email: true, locale: true },
         })
-      : booking.lead
+      : booking.lead)
   if (!lead.email || !hasLocale(lead.locale)) {
     throw new Error("Payment notification recipient is unavailable")
   }
@@ -60,14 +63,16 @@ export async function paymentNotificationMessages({
       recipientType: "client",
       ...copy,
     },
-    {
-      bookingRequest: bookingRequestID,
-      deduplicationKey: `${base}:internal`,
-      paymentOrder: paymentOrderID,
-      recipient: env.EMAIL_FROM ?? "disabled@invalid.local",
-      recipientType: "internal",
-      subject: `PURITY — payment ${status}`,
-      text: `Order ${orderUUID} is ${status}. Review the verified record in Payload Admin.`,
-    },
+    ...(await internalNotificationMessages(
+      payload,
+      {
+        bookingRequest: bookingRequestID,
+        deduplicationKey: `${base}:internal`,
+        paymentOrder: paymentOrderID,
+        subject: `PURITY — payment ${status}`,
+        text: `Order ${orderUUID} is ${status}. Review the verified record in Payload Admin.`,
+      },
+      req
+    )),
   ]
 }

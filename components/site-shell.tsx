@@ -18,6 +18,7 @@ import {
 import type { HeaderData, SiteSettingsData } from "@/content/public-api"
 import { localizePath, type Locale } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { CartLink } from "@/features/cart/cart-controls"
 
 const subscribe = () => () => undefined
 
@@ -148,11 +149,12 @@ function SiteHeaderClient({
             : "bg-background text-muted-foreground"
       )}
     >
-      <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-5">
+      <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2 sm:gap-5">
         <Link
           href={localizePath(locale)}
+          prefetch={false}
           aria-label={brandName}
-          className="flex min-h-11 w-32 shrink-0 items-center focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:w-36"
+          className="flex min-h-11 w-24 shrink-0 items-center focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none min-[360px]:w-32 sm:w-36"
         >
           <BrandLogo
             locale={locale}
@@ -176,7 +178,8 @@ function SiteHeaderClient({
             </ShellLink>
           ))}
         </nav>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-1 sm:gap-2">
+          <CartLink locale={locale} />
           <div
             className="hidden shrink-0 items-center xl:flex"
             data-testid="header-utilities"
@@ -193,6 +196,7 @@ function SiteHeaderClient({
             />
             <Link
               href={bookingHref}
+              prefetch={false}
               data-testid="header-booking-cta"
               className={cn(
                 buttonVariants({
@@ -242,6 +246,7 @@ function SiteHeaderClient({
               <SheetHeader className="flex-row items-center justify-between px-6 py-4 md:px-10">
                 <Link
                   href={localizePath(locale)}
+                  prefetch={false}
                   aria-label={brandName}
                   className="flex min-h-11 w-32 items-center focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:w-36"
                 >
@@ -284,6 +289,7 @@ function SiteHeaderClient({
                 </nav>
                 <Link
                   href={bookingHref}
+                  prefetch={false}
                   data-testid="mobile-booking-cta"
                   className={cn(
                     buttonVariants({

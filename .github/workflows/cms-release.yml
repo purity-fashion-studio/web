@@ -46,7 +46,7 @@ jobs:
       NEXT_PUBLIC_PAYLOAD_URL: ${{ vars.NEXT_PUBLIC_PAYLOAD_URL }}
       NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
       NEXT_PUBLIC_INDEXING_ENABLED: ${{ inputs.target == 'production' && vars.NEXT_PUBLIC_INDEXING_ENABLED || 'false' }}
-      NODE_ENV: ${{ inputs.target == 'production' && 'production' || 'development' }}
+      NODE_ENV: production
       PAYLOAD_ENABLED: "true"
       SITE_MODE: ${{ vars.SITE_MODE || 'production' }}
       EMAIL_MODE: ${{ vars.EMAIL_MODE || 'resend' }}

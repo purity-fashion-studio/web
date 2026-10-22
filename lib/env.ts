@@ -36,7 +36,16 @@ const envSchema = z.object({
   LIQPAY_PRIVATE_KEY: z.string().optional(),
 })
 
-const parsed = envSchema.safeParse(process.env)
+// Environment stores and the example file represent unset optional values as
+// empty strings. Required values still fail their runtime checks below.
+const parsed = envSchema.safeParse(
+  Object.fromEntries(
+    Object.entries(process.env).map(([key, value]) => [
+      key,
+      value === "" ? undefined : value,
+    ])
+  )
+)
 
 if (!parsed.success) {
   throw new Error(z.prettifyError(parsed.error))

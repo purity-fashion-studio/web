@@ -158,8 +158,9 @@ export async function POST(request: Request) {
             context: { service: "payment-reconciliation" },
             data: {
               lastReconciledAt: now,
-              nextReconcileAt: nextReconcileAt(attempts, false),
-              reconciliationAttempts: attempts,
+              nextReconcileAt: nextReconcileAt(0, false),
+              // This is a consecutive failure budget, not a polling limit.
+              reconciliationAttempts: 0,
             },
             overrideAccess: true,
           })

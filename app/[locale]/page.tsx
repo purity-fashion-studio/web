@@ -70,7 +70,7 @@ export default async function HomePage({ params }: HomePageProps) {
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section
           className="relative min-h-svh overflow-hidden bg-foreground text-background"
           data-testid="editorial-hero"
@@ -416,7 +416,7 @@ export default async function HomePage({ params }: HomePageProps) {
                         {collection.title}
                       </span>
                       <span className="text-xs leading-5 text-muted-foreground">
-                        {collection.priceNote || home.priceNote}
+                        {home.priceNote}
                       </span>
                     </span>
                     {collectionImage?.src && (

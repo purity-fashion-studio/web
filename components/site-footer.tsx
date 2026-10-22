@@ -122,6 +122,7 @@ export function SiteFooter({
           )}
           <Link
             href={localizePath(locale, settingsData.contacts.actionPath)}
+            prefetch={false}
             data-testid="footer-booking-cta"
             className={cn(
               buttonVariants({

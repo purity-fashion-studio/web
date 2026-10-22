@@ -33,7 +33,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   for (const locale of locales) {
     paths.add(localizePath(locale))
-    paths.add(localizePath(locale, "/atelier"))
+    if (services.includes("atelier-service"))
+      paths.add(localizePath(locale, "/atelier"))
     directions.forEach((slug) => paths.add(localizePath(locale, `/${slug}`)))
     pages
       .filter((slug) => slug !== "booking")
@@ -47,7 +48,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     collections.forEach((slug) =>
       paths.add(localizePath(locale, `/collections/${slug}`))
     )
-    paths.add(localizePath(locale, "/portfolio"))
+
     portfolioCases.forEach((slug) =>
       paths.add(localizePath(locale, `/portfolio/${slug}`))
     )

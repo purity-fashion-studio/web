@@ -17,7 +17,7 @@ business integrations or change the business domain as part of preview delivery.
 3. Back up the database, then run `pnpm payload:migrate:status` and
    `pnpm payload:migrate` before switching application traffic.
 4. Run the reviewed SHA through the `CMS release operation` workflow with
-   `BOOTSTRAP_PRODUCTION`; then run `pnpm cms:verify` before editors change
+   `BOOTSTRAP_PRODUCTION`; then run `pnpm cms:verify -- --target=production` before editors change
    production content.
 5. Review all three locales in Draft Mode and publish approved records.
 6. Run `pnpm qa:all` from the reviewed checkout. In CI, require the separate
@@ -82,7 +82,7 @@ and revalidation hooks are committed in this repository.
 Before opening editor access:
 
 - migrate an empty and a representative restored database;
-- run `pnpm cms:verify` and compare counts with the reviewed manifest;
+- run `pnpm cms:verify -- --target=production` and compare counts with the reviewed manifest;
 - test owner/editor/support/finance/developer access;
 - test draft, publish, unpublish, slug redirect, and old/new route behavior;
 - review UK/RU/EN without locale fallback;
@@ -110,6 +110,24 @@ Commercial production editing requires isolated database/storage resources,
 an owner account, role acceptance tests, tested backups and approved content.
 Email activation is separate from development editor access. Seed files are
 import/test fixtures, not a source of ongoing editor updates.
+
+## Cart and Checkout
+
+The localized cart persists selection identifiers and options in the browser,
+not authoritative titles, availability or prices. The server resolves each
+selection from published CMS content again before a request or checkout.
+Services, courses and collections retain their own identity. Each selection is
+handled separately; there is no aggregate payment or inventory reservation.
+
+Missing or unapproved prices remain inquiries. Payment checkout requires an
+explicit offer, compatible format, active parent, allowed currency and enabled
+CMS payment routing. A saved request whose checkout could not be opened can be
+retried without creating another booking. Payment redirects never confirm a
+payment, and disabled persistence never simulates a successful request.
+
+Booking submissions retain an access-controlled contact snapshot independently
+of later lead corrections. Browser appointment preferences are sent with an
+explicit offset; they are requests, not confirmed appointments.
 
 ## Future Backlog
 

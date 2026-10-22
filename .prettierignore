@@ -5,3 +5,7 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 .pnpm-store/
+
+# Payload-generated contracts and immutable database migration history.
+payload-types.ts
+payload/migrations/

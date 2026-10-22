@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditorialSections } from "@/components/editorial-sections"
 import { ArrowSquareOutIcon as ExternalLinkIcon } from "@phosphor-icons/react/dist/ssr"
 import { notFound } from "next/navigation"
 
@@ -146,6 +147,7 @@ export async function generateMetadata({
       path: "/contacts",
       title: page.seo.title,
       description: page.seo.description,
+      image: page.seo.image,
     })
   }
 
@@ -186,7 +188,7 @@ export default async function ContactsPage({ params }: ContactsPageProps) {
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath="/contacts" />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={page.eyebrow ?? page.title}
@@ -255,6 +257,7 @@ export default async function ContactsPage({ params }: ContactsPageProps) {
             </Card>
           </div>
         </section>
+        <EditorialSections blocks={page.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath="/contacts" />
     </div>

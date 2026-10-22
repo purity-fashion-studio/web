@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditorialSections } from "@/components/editorial-sections"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -12,8 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { formatOfferPrice, type OfferPriceLabels } from "@/content/commerce"
+
 import { getLocalizedMetadata } from "@/content/metadata"
+import type { OfferPriceLabels } from "@/content/commerce"
 import {
   getFashionCollectionBySlug,
   getSiteSettings,
@@ -21,6 +23,8 @@ import {
 } from "@/content/public-api"
 import { collectionPath } from "@/content/routes"
 import { BookingStartCta } from "@/features/booking/booking-start-cta"
+import { ProductCartControls } from "@/features/cart/product-cart-controls"
+import { ProductOfferSelection } from "@/features/cart/product-offer-selection"
 import { hasLocale, localizePath, type Locale } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +54,7 @@ export async function generateMetadata({
     path: collectionPath(collection.routeSegment),
     title: collection.seo.title,
     description: collection.seo.description,
+    image: collection.seo.image,
   })
 }
 
@@ -67,14 +72,14 @@ function CollectionDetailPage({
   const storyAssets = collection.mediaAssets.slice(1)
   const bookingHref = localizePath(
     locale,
-    "/booking?service=capsule-collection"
+    `/booking?service=capsule-collection&collection=${collection.slug}`
   )
 
   return (
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={collection.eyebrow}
@@ -92,6 +97,15 @@ function CollectionDetailPage({
               label={collection.cta.label}
               serviceSlug="capsule-collection"
               variant="secondary"
+            />
+            <ProductCartControls
+              locale={locale}
+              selection={{
+                kind: "collection",
+                slug: collection.slug,
+                format: "studio",
+                currency: "EUR",
+              }}
             />
             <Link
               href={localizePath(locale, "/services/capsule-collection")}
@@ -242,14 +256,22 @@ function CollectionDetailPage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="border-t border-border pt-5 text-sm leading-7 text-muted-foreground">
-                {collection.offers.length > 0
-                  ? collection.offers
-                      .map(
-                        (offer) =>
-                          `${offer.title}: ${formatOfferPrice(offer, locale, pricingLabels)}`
-                      )
-                      .join(" · ")
-                  : collection.narrative}
+                {collection.offers.length ? (
+                  <div className="grid gap-6">
+                    {collection.offers.map((offer) => (
+                      <ProductOfferSelection
+                        key={offer.id}
+                        kind="collection"
+                        slug={collection.slug}
+                        offer={offer}
+                        locale={locale}
+                        priceLabels={pricingLabels}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  collection.narrative
+                )}
               </CardContent>
             </Card>
           </div>
@@ -274,6 +296,10 @@ function CollectionDetailPage({
             </CardContent>
           </Card>
         </section>
+        <EditorialSections
+          blocks={collection.editorialBlocks}
+          locale={locale}
+        />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>

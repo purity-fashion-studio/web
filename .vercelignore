@@ -9,6 +9,7 @@ test-results
 tests
 docs
 public/media
+.payload-media
 *.tsbuildinfo
 AGENTS.md
 .agents
