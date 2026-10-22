@@ -19,13 +19,24 @@ const disconnect = vi.fn()
 const addEventListener = vi.fn()
 const removeEventListener = vi.fn()
 const location = { hash: "" }
+let activeElement: unknown
 
 beforeEach(() => {
   vi.clearAllMocks()
   location.hash = ""
+  activeElement = undefined
+  focus.mockImplementation(() => {
+    activeElement = findMain()
+  })
   findMain.mockReturnValue(null)
   vi.stubGlobal("window", { location, addEventListener, removeEventListener })
-  vi.stubGlobal("document", { getElementById: findMain, body: {} })
+  vi.stubGlobal("document", {
+    getElementById: findMain,
+    body: {},
+    get activeElement() {
+      return activeElement
+    },
+  })
   vi.stubGlobal(
     "MutationObserver",
     class {
@@ -60,6 +71,20 @@ it("focuses a main boundary that arrives after the skip link was activated", () 
   state.mutation?.()
   expect(focus).toHaveBeenCalledOnce()
   expect(disconnect).toHaveBeenCalled()
+})
+
+it("keeps waiting when streamed main markup exists but cannot yet receive focus", () => {
+  location.hash = "#main-content"
+  findMain.mockReturnValue({ focus })
+  focus.mockImplementation(() => {})
+  SkipLink({ label: "Skip" })
+  expect(observe).toHaveBeenCalled()
+  expect(disconnect).not.toHaveBeenCalled()
+  focus.mockImplementation(() => {
+    activeElement = findMain()
+  })
+  state.mutation?.()
+  expect(disconnect).toHaveBeenCalledOnce()
 })
 
 it("focuses an existing main boundary and cleans up its hash listener", () => {

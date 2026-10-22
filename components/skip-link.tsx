@@ -13,12 +13,20 @@ export function SkipLink({ label }: { label: string }) {
       const main = document.getElementById("main-content")
       if (main) {
         main.focus()
-        observer?.disconnect()
-        return
+        if (document.activeElement === main) {
+          observer?.disconnect()
+          return
+        }
       }
-      // The link can be activated before a streamed page supplies its main.
+      // Streamed markup may exist inside a hidden staging container before
+      // React reveals it. Presence alone does not prove focus succeeded.
       observer ??= new MutationObserver(focusMain)
-      observer.observe(document.body, { childList: true, subtree: true })
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden", "inert", "style"],
+      })
     }
     focusMain()
     window.addEventListener("hashchange", focusMain)
