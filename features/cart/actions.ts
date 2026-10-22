@@ -8,6 +8,8 @@ import {
   isOfferFormatCompatible,
 } from "@/features/booking/offer-eligibility"
 import { routePaymentProvider } from "@/features/booking/schema"
+import { selectedAmount } from "@/features/booking/offer-amount"
+import { selectedRequestMode } from "@/features/booking/offer-request-mode"
 import { hasLocale } from "@/i18n/routing"
 import { isPaymentAmountAllowed } from "@/lib/payment-limits"
 import type { Locale } from "@/i18n/routing"
@@ -98,25 +100,15 @@ export async function resolveCart(
     const offer = offers?.docs[0]
     if (
       selection.offerId &&
-      (!offer || !isOfferFormatCompatible(offer, selection.format))
+      (!offer ||
+        !offer.enabled ||
+        offer._status !== "published" ||
+        !isOfferFormatCompatible(offer, selection.format))
     ) {
       items.push({ ...unavailable, title: entity.title })
       continue
     }
-    const price = offer?.prices?.find(
-      (price) => price.currency === selection.currency
-    )
-    const amount =
-      offer?.checkoutMode === "deposit"
-        ? (offer.deposit?.amount ??
-          (offer.pricingMode === "fixed" &&
-          price?.amount != null &&
-          offer.deposit?.percentage != null
-            ? Math.round((price.amount * offer.deposit.percentage) / 100)
-            : null))
-        : offer?.pricingMode === "fixed"
-          ? price?.amount
-          : null
+    const amount = offer ? selectedAmount(offer, selection.currency) : null
     const requiresQuote =
       !offer ||
       !isOfferCheckoutEligible(offer) ||
@@ -130,6 +122,14 @@ export async function resolveCart(
           route.enabled &&
           route.provider === routePaymentProvider(selection.currency)
       )
+    if (requiresQuote && !selectedRequestMode(offer, settings.enabledModes)) {
+      items.push({
+        ...unavailable,
+        title: entity.title,
+        offerTitle: offer?.title,
+      })
+      continue
+    }
     const query = new URLSearchParams({
       service:
         selection.kind === "service"

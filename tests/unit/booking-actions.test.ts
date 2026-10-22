@@ -78,6 +78,7 @@ vi.mock("@/features/booking/advisory-lock", () => ({
 }))
 
 import { submitBooking } from "@/features/booking/actions"
+import { resolveCart } from "@/features/cart/actions"
 
 const values = {
   inquiryType: "private",
@@ -142,7 +143,15 @@ beforeEach(() => {
   state.payload.find.mockImplementation(async ({ collection }) => ({
     docs:
       collection === "services"
-        ? [{ id: "service", slug: "atelier-service", title: "Atelier" }]
+        ? [
+            {
+              id: "service",
+              slug: "atelier-service",
+              title: "Atelier",
+              enabled: true,
+              _status: "published",
+            },
+          ]
         : collection === "offers"
           ? state.offer
             ? [state.offer]
@@ -465,4 +474,148 @@ it("retains an explicit coming-soon offer as a quote request, not a payment", as
     ).status
   ).toBe("success")
   expect(state.createOrder).not.toHaveBeenCalled()
+})
+
+it.each([
+  { deposit: { amount: 300 }, expected: 300 },
+  { deposit: { percentage: 25 }, expected: 250 },
+])(
+  "keeps cart and server deposit currency contracts aligned: $deposit",
+  async ({ deposit, expected }) => {
+    state.offer = { ...paidOffer, checkoutMode: "deposit", deposit }
+    const selection = {
+      kind: "service",
+      slug: "atelier-service",
+      offerId: "offer",
+      format: "studio",
+      currency: "EUR",
+    }
+    const [supported] = await resolveCart("en", [selection])
+    expect(supported).toMatchObject({ available: true, requiresQuote: false })
+    expect(supported?.price).toContain((expected / 100).toFixed(2))
+    const query = new URL(supported!.bookingPath!, "http://localhost")
+      .searchParams
+    expect(
+      (
+        await submitBooking(
+          { status: "idle" },
+          form({ offerId: query.get("offer")!, intent: query.get("intent")! })
+        )
+      ).status
+    ).toBe("success")
+    expect(state.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "payment-orders",
+        data: expect.objectContaining({ amount: expected, currency: "EUR" }),
+      })
+    )
+    vi.clearAllMocks()
+    state.settings.providerRouting.push({
+      currency: "UAH",
+      provider: "liqpay",
+      enabled: true,
+    })
+    const [unsupported] = await resolveCart("en", [
+      { ...selection, currency: "UAH" },
+    ])
+    expect(unsupported?.requiresQuote).toBe(true)
+    expect(unsupported?.price).toBeUndefined()
+    expect(unsupported?.bookingPath).toContain("intent=request")
+    expect(
+      await submitBooking(
+        { status: "idle" },
+        form({
+          offerId: "offer",
+          intent: "checkout",
+          budgetCurrency: "UAH",
+          amount: "1",
+        })
+      )
+    ).toMatchObject({ status: "error", message: "validation" })
+    expect(state.payload.create).not.toHaveBeenCalled()
+  }
+)
+
+it.each([
+  { mode: "waitlist", enabled: ["waitlist"] },
+  { mode: "waitlist", enabled: ["waitlist", "booking-request"] },
+  { mode: "booking-request", enabled: ["booking-request"] },
+  { mode: "inquiry", enabled: ["inquiry", "booking-request"] },
+])(
+  "preserves explicit $mode from cart continuation to saved booking with $enabled",
+  async ({ mode, enabled }) => {
+    state.offer = {
+      ...paidOffer,
+      checkoutMode: mode,
+      pricingMode: "custom",
+      prices: [],
+    }
+    state.settings.enabledModes = enabled
+    const [item] = await resolveCart("en", [
+      {
+        kind: "service",
+        slug: "atelier-service",
+        offerId: "offer",
+        format: "studio",
+        currency: "EUR",
+      },
+    ])
+    expect(item).toMatchObject({ available: true, requiresQuote: true })
+    const query = new URL(item!.bookingPath!, "http://localhost").searchParams
+    expect(
+      (
+        await submitBooking(
+          { status: "idle" },
+          form({ offerId: query.get("offer")!, intent: query.get("intent")! })
+        )
+      ).status
+    ).toBe("success")
+    expect(state.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "booking-requests",
+        data: expect.objectContaining({ requestMode: mode, offer: "offer" }),
+      })
+    )
+    expect(state.payload.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: "payment-orders" })
+    )
+  }
+)
+
+it("does not offer a continuation for a disabled explicit waitlist mode", async () => {
+  state.offer = { ...paidOffer, checkoutMode: "waitlist" }
+  const [item] = await resolveCart("en", [
+    {
+      kind: "service",
+      slug: "atelier-service",
+      offerId: "offer",
+      format: "studio",
+      currency: "EUR",
+    },
+  ])
+  expect(item?.available).toBe(false)
+  expect(item?.bookingPath).toBeUndefined()
+  expect(
+    (
+      await submitBooking(
+        { status: "idle" },
+        form({ offerId: "offer", intent: "request" })
+      )
+    ).status
+  ).toBe("error")
+  expect(state.payload.create).not.toHaveBeenCalled()
+})
+
+it("does not advertise a generic request when both fallback modes are disabled", async () => {
+  state.settings.enabledModes = ["waitlist"]
+  const [item] = await resolveCart("en", [
+    {
+      kind: "service",
+      slug: "atelier-service",
+      format: "studio",
+      currency: "EUR",
+    },
+  ])
+  expect(item?.available).toBe(false)
+  expect(item?.bookingPath).toBeUndefined()
 })

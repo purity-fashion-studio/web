@@ -4,7 +4,7 @@ import { contentCacheIdentity } from "@/content/cache-identity"
 
 it("retires cached static-media views when switching to protected upload delivery", () => {
   expect(contentCacheIdentity({ localMedia: true })).toMatch(
-    /^purity-payload-cache-v5:/
+    /^purity-payload-cache-v6:/
   )
 })
 

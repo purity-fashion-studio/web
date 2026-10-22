@@ -16,7 +16,6 @@ export function contentCacheIdentity({
     database?.pathname,
     localMedia,
   ])
-  // Earlier views contain static /media paths; they must not survive the move
-  // to Payload's access-controlled upload delivery, including local rebuilds.
-  return `purity-payload-cache-v5:${deploymentKey}:${createHash("sha256").update(identity).digest("hex").slice(0, 20)}`
+  // Retire views with provider URLs as well as old static local media paths.
+  return `purity-payload-cache-v6:${deploymentKey}:${createHash("sha256").update(identity).digest("hex").slice(0, 20)}`
 }

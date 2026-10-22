@@ -28,6 +28,8 @@ import { AdvisoryLockTimeoutError, withAdvisoryLock } from "./advisory-lock"
 import { requestReceivedEmail } from "./email-copy"
 import { ensureCheckout } from "./checkout-persistence"
 import { internalNotificationMessages } from "./notification-recipients"
+import { selectedAmount } from "./offer-amount"
+import { selectedRequestMode } from "./offer-request-mode"
 import { readSubmissionSnapshot } from "./submission-snapshot"
 import {
   deliverNotificationBatch,
@@ -41,7 +43,6 @@ import {
   type BookingFieldErrors,
   type BookingResult,
   type BookingValues,
-  type PaymentCurrency,
 } from "./schema"
 import {
   isOfferCheckoutEligible,
@@ -218,38 +219,6 @@ function attribution(formData: FormData) {
 
 function requestFormat(format: BookingValues["format"]) {
   return format === "atelier" ? "remote-atelier" : format
-}
-
-function selectedAmount(
-  offer: {
-    pricingMode: "fixed" | "from" | "range" | "custom"
-    checkoutMode:
-      "instant-payment" | "deposit" | "booking-request" | "inquiry" | "waitlist"
-    prices?: Array<{
-      currency: "EUR" | "UAH"
-      amount?: number | null
-      minAmount?: number | null
-    }> | null
-    deposit?: { amount?: number | null; percentage?: number | null }
-  },
-  currency: PaymentCurrency
-) {
-  const price = offer.prices?.find((item) => item.currency === currency)
-  if (!price) return null
-
-  if (offer.checkoutMode === "instant-payment") {
-    return offer.pricingMode === "fixed" ? (price.amount ?? null) : null
-  }
-  if (offer.checkoutMode !== "deposit") return null
-  if (offer.deposit?.amount != null) return offer.deposit.amount
-  if (
-    offer.deposit?.percentage != null &&
-    offer.pricingMode === "fixed" &&
-    price.amount != null
-  ) {
-    return Math.round((price.amount * offer.deposit.percentage) / 100)
-  }
-  return null
 }
 
 export async function submitBooking(
@@ -611,12 +580,11 @@ export async function submitBooking(
         )
         const requestMode =
           checkoutIntent === "request"
-            ? bookingSettings.enabledModes.includes("booking-request")
-              ? "booking-request"
-              : "inquiry"
+            ? selectedRequestMode(offer, bookingSettings.enabledModes)
             : (offer?.checkoutMode ?? "booking-request")
         const paymentProvider = routePaymentProvider(booking.budgetCurrency)
         if (
+          !requestMode ||
           !bookingSettings.enabledModes.includes(requestMode) ||
           (requiresPayment &&
             !bookingSettings.providerRouting?.some(

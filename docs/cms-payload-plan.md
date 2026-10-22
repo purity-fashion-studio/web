@@ -69,6 +69,20 @@ paste is disabled. Thumbnail, card, editorial and hero derivatives are
 generated. Public reads require visibility, approved and non-expired rights.
 Generated media cannot be real client proof.
 
+Public pages deliver CMS images and their upload-time derivatives through
+`/api/media/file/…`, never through direct Blob URLs or Next's independent image
+cache. Every new file request checks the current Media ACL and returns private,
+no-store headers. Next optimization remains available only for static brand
+assets; CMS URLs, including formerly warmed optimizer URLs, are rejected.
+
+Revocation prevents new origin delivery through the application. It cannot erase
+bytes already downloaded, browser-held images or provider caches. The configured
+Blob adapter uses public objects: anyone already holding a direct provider URL
+can still retrieve it independently of Payload. Do not upload confidential media
+to that public store. Private storage and controlled migration of existing
+objects are required before claiming provider-level confidentiality; application
+ACLs alone do not provide it.
+
 ## Runtime source
 
 The public runtime is Payload-only. Static content is a versioned one-time

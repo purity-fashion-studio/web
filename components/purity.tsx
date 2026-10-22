@@ -139,6 +139,7 @@ function ImageFrame({
           <Image
             alt={alt}
             src={src}
+            unoptimized={!src.startsWith("/brand/")}
             fill
             sizes="(min-width: 768px) 50vw, 100vw"
             loading={eager ? "eager" : "lazy"}
@@ -179,6 +180,7 @@ function EditorialHero({
         <Image
           alt={mediaAsset.alt[locale]}
           src={mediaAsset.src}
+          unoptimized
           fill
           preload
           sizes="100vw"

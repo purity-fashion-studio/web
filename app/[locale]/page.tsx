@@ -80,6 +80,7 @@ export default async function HomePage({ params }: HomePageProps) {
               <Image
                 alt={heroImage.alt[locale]}
                 src={heroImage.src}
+                unoptimized
                 fill
                 priority
                 sizes="100vw"
@@ -175,6 +176,7 @@ export default async function HomePage({ params }: HomePageProps) {
             <Image
               alt=""
               src={directionsTexture.src}
+              unoptimized
               fill
               sizes="100vw"
               className="object-cover"
@@ -439,6 +441,7 @@ export default async function HomePage({ params }: HomePageProps) {
             <Image
               alt={portfolioImage.alt[locale]}
               src={portfolioImage.src}
+              unoptimized
               fill
               sizes="100vw"
               className="object-cover"

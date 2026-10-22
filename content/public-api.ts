@@ -408,23 +408,6 @@ async function getPayloadAccess(draft: boolean) {
   }
 }
 
-function getPublicMediaURL(value: string): string {
-  try {
-    const url = new URL(value)
-
-    // Payload's protected-upload URL is generated from `serverURL`. Keep it
-    // origin-relative so Preview media uses the active protected deployment
-    // instead of a build-time localhost or an uncredentialed deployment URL.
-    if (url.pathname.startsWith("/api/media/")) {
-      return `${url.pathname}${url.search}`
-    }
-  } catch {
-    // A relative URL is already safe to render as-is.
-  }
-
-  return value
-}
-
 function payloadMediaToView(
   media: Media,
   locale: Locale
@@ -438,8 +421,8 @@ function payloadMediaToView(
   }
 
   const preferredSize = media.sizes?.hero
-  const src = preferredSize?.url ?? media.url ?? undefined
-  if (!src) return undefined
+  const filename = preferredSize?.filename ?? media.filename
+  if (!filename) return undefined
 
   const alt = { uk: media.alt, ru: media.alt, en: media.alt }
   const internalLabel = {
@@ -457,7 +440,9 @@ function payloadMediaToView(
     fileName: media.filename ?? media.id,
     aspectRatio:
       media.width && media.height ? `${media.width}/${media.height}` : "4/3",
-    src: getPublicMediaURL(src),
+    // Never publish a storage-provider URL. Both local and Blob adapters serve
+    // this endpoint only after checking the current Media read access policy.
+    src: `/api/media/file/${encodeURIComponent(filename)}`,
     heroFocalPoint: focalX < 34 ? "left" : focalX > 66 ? "right" : "center",
     usage: media.allowedUsageContexts ?? [],
     internalLabel,

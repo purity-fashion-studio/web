@@ -423,7 +423,12 @@ test("new uploads render after startup and revoked media disappears from cached 
     }
     expect(uploaded.status()).toBe(201)
     const { doc: media } = (await uploaded.json()) as {
-      doc: { id: string; filename: string; isRealClientProof: boolean }
+      doc: {
+        id: string
+        filename: string
+        isRealClientProof: boolean
+        sizes?: Record<string, { filename?: string | null }>
+      }
     }
     expect(typeof media.id).toBe("string")
     expect(media.isRealClientProof).toBe(false)
@@ -476,6 +481,62 @@ test("new uploads render after startup and revoked media disappears from cached 
         image.evaluate((element) => (element as HTMLImageElement).naturalWidth)
       )
       .toBeGreaterThan(0)
+    // Exercise the actual production optimizer, not CI's unoptimized mode.
+    // Remember every delivery URL before revocation, including generated files.
+    expect(Object.values(media.sizes ?? {}).some((size) => size.filename)).toBe(
+      true
+    )
+    if (process.env.CI !== "true") {
+      const brandURL =
+        "/_next/image?url=%2Fbrand%2Flogo-mark-grey.png&w=640&q=75"
+      expect((await anonymous.request.get(brandURL)).status()).toBe(200)
+      const brandHit = await anonymous.request.get(brandURL)
+      expect(brandHit.status()).toBe(200)
+      expect(brandHit.headers()["x-nextjs-cache"]).toBe("HIT")
+    }
+    const deliveryURLs = new Set([
+      await image.evaluate(
+        (element) => (element as HTMLImageElement).currentSrc
+      ),
+      `/api/media/file/${media.filename}`,
+      ...Object.values(media.sizes ?? {})
+        .filter((size) => size.filename)
+        .map((size) => `/api/media/file/${size.filename}`),
+    ])
+    const noStoreHeaders = (response: APIResponse) => {
+      expect(response.headers()["cache-control"]).toContain("private, no-store")
+      expect(response.headers()["cdn-cache-control"]).toBe("no-store")
+      expect(response.headers()["vercel-cdn-cache-control"]).toBe("no-store")
+    }
+    for (const url of [...deliveryURLs]) {
+      const direct = await anonymous.request.get(url)
+      expect(direct.status()).toBe(200)
+      noStoreHeaders(direct)
+      const range = await anonymous.request.get(url, {
+        headers: { Range: "bytes=0-31" },
+      })
+      expect(range.status()).toBe(206)
+      expect((await range.body()).length).toBe(32)
+      noStoreHeaders(range)
+      const conditional = await anonymous.request.get(url, {
+        headers: {
+          "If-None-Match": direct.headers().etag ?? '"previous-public-copy"',
+        },
+      })
+      // Local Payload streams 200; Blob can return 304 after its ACL check.
+      expect([200, 304]).toContain(conditional.status())
+      noStoreHeaders(conditional)
+      const parsedURL = new URL(url, fixtureBaseURL)
+      const source =
+        parsedURL.pathname === "/_next/image"
+          ? parsedURL.searchParams.get("url")!
+          : parsedURL.pathname
+      const optimized = `/_next/image?${new URLSearchParams({ url: source, w: "640", q: "75" })}`
+      const response = await anonymous.request.get(optimized)
+      // Static-only optimizer policies reject CMS URLs even before revocation.
+      expect(response.status()).toBe(process.env.CI === "true" ? 404 : 400)
+      deliveryURLs.add(optimized)
+    }
     await writeCMS(
       request,
       "patch",
@@ -485,6 +546,34 @@ test("new uploads render after startup and revoked media disappears from cached 
         publicVisibility: false,
       }
     )
+    const freshAnonymous = await apiRequest.newContext({
+      baseURL: fixtureBaseURL,
+    })
+    try {
+      for (const url of deliveryURLs) {
+        const replay = await freshAnonymous.get(url)
+        expect(
+          replay.status(),
+          `revoked delivery ${url}`
+        ).toBeGreaterThanOrEqual(400)
+        if (
+          new URL(url, fixtureBaseURL).pathname.startsWith("/api/media/file/")
+        ) {
+          noStoreHeaders(replay)
+          const conditionalHeaders: Record<string, string>[] = [
+            { Range: "bytes=0-31" },
+            { "If-None-Match": '"previous-public-copy"' },
+          ]
+          for (const headers of conditionalHeaders) {
+            const denied = await freshAnonymous.get(url, { headers })
+            expect([401, 403, 404]).toContain(denied.status())
+            noStoreHeaders(denied)
+          }
+        }
+      }
+    } finally {
+      await freshAnonymous.dispose()
+    }
     await screen.reload()
     await expect(
       screen.getByRole("heading", { name: `en ${prefix} title`, exact: true })
