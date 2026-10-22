@@ -25,7 +25,8 @@ test.beforeAll(async () => {
     "../../payload.config.ts",
     import.meta.url
   )) as typeof import("../../payload.config")
-  payload = await getPayload({ config })
+  // This file owns and closes its pool; never reuse another suite's singleton.
+  payload = await getPayload({ config, key: prefix })
   const identity = await payload.db.pool.query<{
     name: string
     address: string
