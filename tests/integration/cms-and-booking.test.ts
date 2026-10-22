@@ -4,7 +4,10 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest"
 import { getPayload, type CollectionSlug, type Payload } from "payload"
 
 import type { User } from "@/payload-types"
-import { assertIsolatedTestDatabase } from "@/scripts/test-database"
+import {
+  assertIsolatedDatabaseIdentity,
+  assertIsolatedTestDatabase,
+} from "@/scripts/test-database"
 
 const requestState = vi.hoisted(() => ({ ip: 1 }))
 vi.mock("next/headers", () => ({
@@ -22,6 +25,7 @@ const prefix = `qa-${randomUUID()}`
 const created: Array<{ collection: CollectionSlug; id: string }> = []
 const accounts = new Map<string, User & { collection: "users" }>()
 let payload: Payload
+let databaseVerified = false
 let serviceID: string
 let originalPage: Record<string, unknown>
 const password = `${randomUUID()}-Local-QA-only`
@@ -74,8 +78,8 @@ beforeAll(async () => {
     name: string
     address: string
   }>("SELECT current_database() AS name, host(inet_server_addr()) AS address")
-  expect(identity.rows[0]?.name).toBe(process.env.PURITY_TEST_DATABASE)
-  expect(["127.0.0.1", "::1"]).toContain(identity.rows[0]?.address)
+  assertIsolatedDatabaseIdentity(identity.rows[0])
+  databaseVerified = true
   const owner = await payload.create({
     collection: "users",
     overrideAccess: true,
@@ -127,6 +131,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!payload) return
   try {
+    if (!databaseVerified) return
     const bookings = await payload.find({
       collection: "booking-requests",
       overrideAccess: true,

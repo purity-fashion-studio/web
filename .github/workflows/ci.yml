@@ -70,6 +70,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Identify isolated PostgreSQL service
+        env:
+          DATABASE_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: |
+          address="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$DATABASE_SERVICE_ID")"
+          test -n "$address"
+          printf 'PURITY_TEST_DATABASE_SERVER_ADDRESS=%s\n' "$address" >> "$GITHUB_ENV"
       - name: Set up pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.0
         with:
@@ -130,6 +137,13 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Identify isolated PostgreSQL service
+        env:
+          DATABASE_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: |
+          address="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$DATABASE_SERVICE_ID")"
+          test -n "$address"
+          printf 'PURITY_TEST_DATABASE_SERVER_ADDRESS=%s\n' "$address" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.0
         with:
           version: 10.28.0

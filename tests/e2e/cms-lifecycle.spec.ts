@@ -11,7 +11,10 @@ import {
 import { getPayload, type Payload } from "payload"
 import { tsImport } from "tsx/esm/api"
 
-import { assertIsolatedTestDatabase } from "../../scripts/test-database"
+import {
+  assertIsolatedDatabaseIdentity,
+  assertIsolatedTestDatabase,
+} from "../../scripts/test-database"
 
 const prefix = `qa-browser-${randomUUID()}`
 const password = `${randomUUID()}-Local-QA-only`
@@ -20,6 +23,7 @@ const fixtureBaseURL =
 const locales = ["uk", "ru", "en"] as const
 const accountIDs: string[] = []
 let payload: Payload
+let databaseVerified = false
 let originalPageID: string
 let originalUsers: number
 
@@ -37,8 +41,8 @@ test.beforeAll(async () => {
     name: string
     address: string
   }>("SELECT current_database() AS name, host(inet_server_addr()) AS address")
-  expect(identity.rows[0]?.name).toBe(process.env.PURITY_TEST_DATABASE)
-  expect(["127.0.0.1", "::1"]).toContain(identity.rows[0]?.address)
+  assertIsolatedDatabaseIdentity(identity.rows[0])
+  databaseVerified = true
   originalUsers = (
     await payload.count({ collection: "users", overrideAccess: true })
   ).totalDocs
@@ -95,6 +99,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (!payload) return
   try {
+    if (!databaseVerified) return
     try {
       await cleanupPublicFixtures()
     } finally {
