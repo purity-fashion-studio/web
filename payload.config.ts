@@ -148,7 +148,7 @@ export default buildConfig({
     pool: { connectionString: databaseURL },
     push:
       env.NODE_ENV === "development" &&
-      process.env.CI !== "true" &&
+      !process.env.CI &&
       env.VERCEL_ENV === undefined &&
       ["localhost", "127.0.0.1", "[::1]"].includes(
         new URL(databaseURL).hostname
@@ -266,7 +266,7 @@ export default buildConfig({
   typescript: {
     autoGenerate:
       env.NODE_ENV === "development" &&
-      process.env.CI !== "true" &&
+      !process.env.CI &&
       env.VERCEL_ENV === undefined,
     outputFile: path.resolve(dirname, "payload-types.ts"),
   },

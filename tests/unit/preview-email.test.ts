@@ -253,3 +253,20 @@ it("never enables development schema push on a deployed runtime", async () => {
     expect.objectContaining({ push: false })
   )
 })
+
+it.each(["true", "1"])(
+  "disables schema push and automatic contract writes for CI=%s",
+  async (marker) => {
+    previewEnvironment()
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("VERCEL_ENV", undefined)
+    vi.stubEnv("CI", marker)
+    const { postgresAdapter } = await import("@payloadcms/db-postgres")
+    vi.mocked(postgresAdapter).mockClear()
+    const { default: config } = await import("@/payload.config")
+    expect(postgresAdapter).toHaveBeenCalledWith(
+      expect.objectContaining({ push: false })
+    )
+    expect((await config).typescript.autoGenerate).toBe(false)
+  }
+)
