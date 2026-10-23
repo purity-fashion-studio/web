@@ -20,7 +20,19 @@ function requiredLocalizedFields(
   prefix = ""
 ): string[] {
   return fields.flatMap((field) => {
-    if (!("name" in field) || !field.name) return []
+    if (field.type === "tabs") {
+      return field.tabs.flatMap((tab) =>
+        requiredLocalizedFields(
+          tab.fields,
+          "name" in tab && tab.name ? `${prefix}${tab.name}.` : prefix
+        )
+      )
+    }
+    if (!("name" in field) || !field.name) {
+      return "fields" in field
+        ? requiredLocalizedFields(field.fields, prefix)
+        : []
+    }
     const nested =
       !("localized" in field && field.localized) &&
       "fields" in field &&

@@ -19,14 +19,17 @@ const protectionBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
-  workers: process.env.CI ? 2 : undefined,
+  // CMS lifecycle files temporarily provision owners in the isolated database.
+  // Keep the first-owner and role scenarios serialized in local runs and CI.
+  workers: 1,
   ...(usesRemoteBaseURL
     ? {}
     : {
         webServer: {
           command: "pnpm start",
           url: `${baseURL}/uk`,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer:
+            !process.env.CI && !process.env.PURITY_TEST_DATABASE,
           timeout: 60_000,
         },
       }),

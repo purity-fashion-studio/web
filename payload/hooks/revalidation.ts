@@ -107,11 +107,13 @@ export function publicCollectionHooks({
       `cms:${collectionTag}`,
       "cms:metadata",
       "cms:sitemap",
+      "cms:editorial",
     ]
     if (currentSlug) tags.push(`cms:${collectionTag}:${currentSlug}`)
     if (previousSlug) tags.push(`cms:${collectionTag}:${previousSlug}`)
     if (revalidateNavigation) tags.push("cms:navigation")
 
+    if (collectionTag === "directions") tags.push("cms:services", "cms:courses")
     invalidate(tags, [
       ...localizedPaths(pathPrefix, currentSlug),
       ...localizedPaths(pathPrefix, previousSlug),
@@ -136,9 +138,15 @@ export function publicCollectionHooks({
   }
 
   const afterDelete: CollectionAfterDeleteHook<PublicDocument> = ({ doc }) => {
-    const tags = [`cms:${collectionTag}`, "cms:metadata", "cms:sitemap"]
+    const tags = [
+      `cms:${collectionTag}`,
+      "cms:metadata",
+      "cms:sitemap",
+      "cms:editorial",
+    ]
     if (doc.slug) tags.push(`cms:${collectionTag}:${doc.slug}`)
     if (revalidateNavigation) tags.push("cms:navigation")
+    if (collectionTag === "directions") tags.push("cms:services", "cms:courses")
     invalidate(tags, [...localizedPaths(pathPrefix, doc.slug), "/sitemap.xml"])
     return doc
   }
@@ -185,23 +193,23 @@ export const revalidateDeletedOffer: CollectionAfterDeleteHook = ({ doc }) => {
 }
 
 export const revalidateTestimonials: CollectionAfterChangeHook = ({ doc }) => {
-  invalidate(["cms:testimonials", "cms:home"], [])
+  invalidate(["cms:testimonials", "cms:home", "cms:editorial"], [])
   return doc
 }
 
 export const revalidateDeletedTestimonial: CollectionAfterDeleteHook = ({
   doc,
 }) => {
-  invalidate(["cms:testimonials", "cms:home"], [])
+  invalidate(["cms:testimonials", "cms:home", "cms:editorial"], [])
   return doc
 }
 
 export function revalidateGlobal(tag: string): GlobalAfterChangeHook {
   return ({ doc }) => {
-    invalidate([`cms:${tag}`, "cms:metadata", "cms:navigation"], [
-      ...locales.map((locale) => `/${locale}`),
-      "/sitemap.xml",
-    ])
+    invalidate(
+      [`cms:${tag}`, "cms:metadata", "cms:navigation"],
+      [...locales.map((locale) => `/${locale}`), "/sitemap.xml"]
+    )
     return doc
   }
 }

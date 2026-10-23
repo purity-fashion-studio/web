@@ -11,11 +11,19 @@ export function localStageTimeout(baseline: number) {
       process.env.PLAYWRIGHT_BASE_URL ?? ""
     )
   ) {
-    throw new Error("Stage deadline overrides require isolated offline loopback execution")
+    throw new Error(
+      "Stage deadline overrides require isolated offline loopback execution"
+    )
   }
   const deadline = Number(value)
-  if (!Number.isInteger(deadline) || deadline < baseline || deadline > 1_200_000) {
-    throw new Error("Local stage deadline must retain the baseline and remain bounded")
+  if (
+    !Number.isInteger(deadline) ||
+    deadline < baseline ||
+    deadline > 1_200_000
+  ) {
+    throw new Error(
+      "Local stage deadline must retain the baseline and remain bounded"
+    )
   }
   return deadline
 }

@@ -33,6 +33,7 @@ export async function generateMetadata({
     path: portfolioCasePath(portfolioCase.routeSegment),
     title: portfolioCase.seo.title,
     description: portfolioCase.seo.description,
+    image: portfolioCase.seo.image,
   })
 }
 

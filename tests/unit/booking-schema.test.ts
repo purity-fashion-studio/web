@@ -36,4 +36,22 @@ describe("booking input contract", () => {
     expect(routePaymentProvider("EUR")).toBe("stripe")
     expect(routePaymentProvider("UAH")).toBe("liqpay")
   })
+
+  it.each(["not-a-date", "2026-02-31T12:00:00Z", "2026-13-01T12:00:00Z"])(
+    "rejects invalid appointment %s",
+    (preferredAt) => {
+      expect(
+        bookingSchema.safeParse({ ...validBooking, preferredAt }).success
+      ).toBe(false)
+    }
+  )
+
+  it("accepts an explicit appointment offset", () => {
+    expect(
+      bookingSchema.safeParse({
+        ...validBooking,
+        preferredAt: "2026-11-20T12:00:00+02:00",
+      }).success
+    ).toBe(true)
+  })
 })

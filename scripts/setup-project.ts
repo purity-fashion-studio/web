@@ -1,7 +1,6 @@
 import { copyFileSync, existsSync } from "node:fs"
 
-const shadcnCommand =
-  "pnpm dlx shadcn@latest apply --preset b59jufTOPg --yes"
+const shadcnCommand = "pnpm dlx shadcn@latest apply --preset b59jufTOPg --yes"
 
 if (!existsSync(".env.local") && existsSync(".env.example")) {
   copyFileSync(".env.example", ".env.local")

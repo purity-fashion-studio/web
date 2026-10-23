@@ -7,11 +7,7 @@ import type {
 } from "./schema"
 
 export type PaymentStatus =
-  | "success"
-  | "pending"
-  | "cancel"
-  | "failure"
-  | "refunded"
+  "success" | "pending" | "cancel" | "failure" | "refunded"
 
 export type BookingPublicCopy = {
   eyebrow: string

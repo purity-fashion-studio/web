@@ -101,6 +101,16 @@ export const BookingRequests: CollectionConfig = {
       fields: [{ name: "preferredAt", type: "date", required: true }],
     },
     { name: "message", type: "textarea", maxLength: 10000 },
+    {
+      name: "submissionSnapshot",
+      type: "json",
+      admin: {
+        readOnly: true,
+        description:
+          "Contact and selection as submitted; independent of later lead edits.",
+      },
+      access: { update: () => false },
+    },
     { name: "currency", type: "select", options: ["EUR", "UAH"] },
     { name: "sourcePage", type: "text", required: true, maxLength: 1000 },
     { name: "referrer", type: "text", maxLength: 1000 },

@@ -5,22 +5,9 @@ import { getPayload } from "payload"
 import config from "../payload.config"
 import { transitionPayment } from "../features/booking/payment-persistence"
 import { processWebhookEvent } from "../features/booking/webhook-events"
+import { assertIsolatedTestDatabase } from "./test-database"
 
-const configuredDatabaseURL = process.env.DATABASE_URL
-assert.ok(
-  configuredDatabaseURL,
-  "Payment integration checks require DATABASE_URL for local PostgreSQL"
-)
-let databaseURL: URL
-try {
-  databaseURL = new URL(configuredDatabaseURL)
-} catch {
-  throw new Error("Payment integration checks require a valid DATABASE_URL")
-}
-assert.ok(
-  ["127.0.0.1", "localhost", "::1"].includes(databaseURL.hostname),
-  "Payment integration checks only run against local PostgreSQL"
-)
+assertIsolatedTestDatabase()
 
 const payload = await getPayload({ config })
 const suffix = randomUUID()

@@ -1,15 +1,31 @@
 {
-  "Metadata": {
-    "title": "PURITY Fashion Studio",
-    "description": "Premium multilingual fashion studio for wardrobe, atelier, and image work."
+  "Cart": {
+    "title": "Your selection",
+    "link": "Cart",
+    "add": "Add to cart",
+    "added": "Added to cart",
+    "remove": "Remove",
+    "empty": "Your cart is empty.",
+    "browse": "Explore services",
+    "summary": "Review each selection before sending a request or paying. Services are arranged separately; adding to cart does not reserve a time.",
+    "quote": "Price and availability need confirmation. Send an inquiry; no payment is taken.",
+    "continue": "Review and continue",
+    "unavailable": "This selection is no longer available. Remove it and choose again.",
+    "error": "We could not update your cart. Please try again. Your browser must allow local storage.",
+    "loading": "Checking current offers…",
+    "price": "Amount due now",
+    "selected": "Selected offer"
   },
-  "Home": {
-    "eyebrow": "Research. Imagine. Create.",
-    "headline": "Your perfect wardrobe starts with structure.",
-    "summary": "{serviceCount, plural, one {# service direction connects wardrobe strategy with studio execution.} other {# service directions connect wardrobe strategy with studio execution.}}",
-    "localeReady": "English experience",
-    "pillResearch": "Research",
-    "pillAtelier": "Atelier",
-    "pillSchool": "School"
+  "BookingMessages": {
+    "checkoutUnavailable": "Your request is saved, but checkout is unavailable. Try again to continue the same request; no payment has been confirmed.",
+    "retryCheckout": "Retry checkout",
+    "serviceUnavailable": "We could not save your request. Please try again or contact the studio directly.",
+    "rateLimit": "Too many requests. Please wait before trying again.",
+    "selectionUnavailable": "The selected offer is unavailable. Return to your cart and choose again."
+  },
+  "System": {
+    "generatedImage": "Generated editorial image",
+    "unavailable": "The studio website is temporarily unavailable.",
+    "retry": "Try again"
   }
 }

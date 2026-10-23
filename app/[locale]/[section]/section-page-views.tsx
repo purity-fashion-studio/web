@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { EditorialSections } from "@/components/editorial-sections"
 
 import {
   EditorialFaq,
@@ -87,7 +88,7 @@ export function StudioPageView({
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath="/studio" />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={publicPage.eyebrow}
@@ -272,6 +273,7 @@ export function StudioPageView({
             href={localizePath(locale, publicPage.cta?.path ?? "/booking")}
           />
         </section>
+        <EditorialSections blocks={pageData.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath="/studio" />
     </div>
@@ -300,7 +302,7 @@ export function LegalPageView({
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={publicPage.eyebrow}
@@ -380,6 +382,7 @@ export function LegalPageView({
             )}
           </div>
         </section>
+        <EditorialSections blocks={pageData.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>
@@ -410,7 +413,7 @@ export function CollectionsPageView({
         currentPath={sectionPath(category.routeSegment)}
       />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={category.title}
@@ -538,6 +541,7 @@ export function CollectionsPageView({
             href={inquiryHref}
           />
         </section>
+        <EditorialSections blocks={direction.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter
         locale={locale}
@@ -576,7 +580,7 @@ export function OfferCategoryPageView({
         currentPath={sectionPath(category.routeSegment)}
       />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={category.title}
@@ -732,6 +736,7 @@ export function OfferCategoryPageView({
             href={localizePath(locale, `/booking?service=${copy.ctaService}`)}
           />
         </section>
+        <EditorialSections blocks={copy.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter
         locale={locale}

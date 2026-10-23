@@ -21,6 +21,19 @@ export const bookingSchema = z
       .min(1, { message: "required" })
       .max(160)
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: "required" }),
+    courseSlug: z
+      .string()
+      .max(160)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional()
+      .or(z.literal("")),
+    collectionSlug: z
+      .string()
+      .max(160)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+      .optional()
+      .or(z.literal("")),
+    intent: z.enum(["request", "checkout"]).optional(),
     name: z.string().trim().min(2, { message: "required" }).max(120),
     email: z.string().trim().email({ message: "email" }).max(160),
     phone: z.string().trim().max(60).optional(),
@@ -28,7 +41,18 @@ export const bookingSchema = z
     format: z.enum(formats),
     contactMethod: z.enum(contactMethods),
     budgetCurrency: z.enum(paymentCurrencies),
-    preferredAt: z.string().trim().max(80).optional(),
+    preferredAt: z
+      .string()
+      .trim()
+      .max(80)
+      .refine(
+        (value) =>
+          !value ||
+          z.iso.datetime({ offset: true, local: true }).safeParse(value)
+            .success,
+        { message: "required" }
+      )
+      .optional(),
     message: z.string().trim().min(20, { message: "message" }).max(1200),
     consent: z.boolean().refine(Boolean, { message: "consent" }),
   })
@@ -66,6 +90,7 @@ export type BookingResult =
       leadId: string
       bookingRequestId?: string
       checkoutUrl?: string
+      checkoutUnavailable?: boolean
       provider?: PaymentProvider
       currency?: PaymentCurrency
     }

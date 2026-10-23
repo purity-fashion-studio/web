@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest"
 
+vi.mock("@payloadcms/db-postgres", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@payloadcms/db-postgres")>()
+  return { ...actual, postgresAdapter: vi.fn(actual.postgresAdapter) }
+})
+
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
@@ -224,3 +230,43 @@ it("commercial Vercel production still requires verified Resend", async () => {
     "RESEND_DOMAIN_VERIFIED must be true in Production"
   )
 })
+
+it("accepts blank optional example values without weakening required credentials", async () => {
+  previewEnvironment()
+  vi.stubEnv("NEXT_PUBLIC_GA4_ID", "")
+  vi.stubEnv("EMAIL_OVERRIDE_RECIPIENT", "")
+  vi.stubEnv("EMAIL_FROM", "")
+  const { env } = await import("@/lib/env")
+  expect(env.NEXT_PUBLIC_GA4_ID).toBeUndefined()
+  expect(env.EMAIL_OVERRIDE_RECIPIENT).toBeUndefined()
+  expect(env.EMAIL_FROM).toBeUndefined()
+})
+
+it("never enables development schema push on a deployed runtime", async () => {
+  previewEnvironment()
+  vi.stubEnv("NODE_ENV", "development")
+  vi.stubEnv("VERCEL_ENV", "preview")
+  const { postgresAdapter } = await import("@payloadcms/db-postgres")
+  vi.mocked(postgresAdapter).mockClear()
+  await import("@/payload.config")
+  expect(postgresAdapter).toHaveBeenCalledWith(
+    expect.objectContaining({ push: false })
+  )
+})
+
+it.each(["true", "1"])(
+  "disables schema push and automatic contract writes for CI=%s",
+  async (marker) => {
+    previewEnvironment()
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("VERCEL_ENV", undefined)
+    vi.stubEnv("CI", marker)
+    const { postgresAdapter } = await import("@payloadcms/db-postgres")
+    vi.mocked(postgresAdapter).mockClear()
+    const { default: config } = await import("@/payload.config")
+    expect(postgresAdapter).toHaveBeenCalledWith(
+      expect.objectContaining({ push: false })
+    )
+    expect((await config).typescript.autoGenerate).toBe(false)
+  }
+)

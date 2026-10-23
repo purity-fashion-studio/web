@@ -1,4 +1,6 @@
 import Link from "next/link"
+import { EditorialSections } from "@/components/editorial-sections"
+import type { EditorialBlock } from "@/content/editorial"
 import type * as React from "react"
 
 import { EditorialHero } from "@/components/purity"
@@ -9,6 +11,7 @@ import type { Locale } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
 
 type ContentPageProps = {
+  editorialBlocks?: EditorialBlock[]
   locale: Locale
   currentPath: string
   eyebrow: string
@@ -33,12 +36,13 @@ function ContentPage({
   mediaAsset,
   action,
   children,
+  editorialBlocks,
 }: ContentPageProps) {
   return (
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={eyebrow}
@@ -87,6 +91,7 @@ function ContentPage({
             </ol>
           </section>
         )}
+        <EditorialSections blocks={editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>

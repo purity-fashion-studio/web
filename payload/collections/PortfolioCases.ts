@@ -18,9 +18,24 @@ const revalidationHooks = publicCollectionHooks({
   pathPrefix: "/portfolio",
 })
 
-const approvedPortfolioRead: Access = ({ req }) => {
+const approvedPortfolioRead: Access = async ({ req }) => {
   if (hasRole(req.user, ["owner", "editor", "developer"])) return true
 
+  const proof = await req.payload.find({
+    collection: "media",
+    depth: 0,
+    limit: 1000,
+    pagination: false,
+    overrideAccess: false,
+    req,
+    select: { filename: true },
+    where: {
+      and: [
+        { isRealClientProof: { equals: true } },
+        { source: { equals: "client" } },
+      ],
+    },
+  })
   const filter: Where = {
     and: [
       { _status: { equals: "published" } },
@@ -28,6 +43,7 @@ const approvedPortfolioRead: Access = ({ req }) => {
       { isRealClientProof: { equals: true } },
       { usageRightsStatus: { equals: "approved" } },
       { approvalStatus: { equals: "approved" } },
+      { media: { in: proof.docs.map(({ id }) => id) } },
     ],
   }
 
@@ -93,6 +109,8 @@ export const PortfolioCases: CollectionConfig = {
           if (
             media.some(
               (item) =>
+                item.source !== "client" ||
+                item.isRealClientProof !== true ||
                 item.usageRightsStatus !== "approved" ||
                 item.publicVisibility !== true ||
                 (item.rightsExpiry &&
@@ -100,7 +118,7 @@ export const PortfolioCases: CollectionConfig = {
             )
           ) {
             throw new Error(
-              "Approved portfolio requires non-expired public media with approved rights."
+              "Approved portfolio requires real client proof with non-expired public media and approved rights."
             )
           }
         }

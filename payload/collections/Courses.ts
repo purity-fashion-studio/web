@@ -9,7 +9,7 @@ import {
   formatsField,
   localizedText,
   localizedTextarea,
-  publicRead,
+  publicReadWithDirection,
 } from "../fields/shared"
 import { publicCollectionHooks } from "../hooks/revalidation"
 import { supplementaryLayoutField } from "../blocks/editorial"
@@ -24,7 +24,7 @@ export const Courses: CollectionConfig = {
   access: {
     create: contentManagers,
     delete: ownerOnly,
-    read: publicRead,
+    read: publicReadWithDirection("direction"),
     readVersions: contentOrDeveloper,
     update: contentManagers,
   },

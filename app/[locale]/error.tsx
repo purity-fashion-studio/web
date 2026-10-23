@@ -42,6 +42,8 @@ export default function LocaleError({ error, reset }: LocaleErrorProps) {
 
   return (
     <main
+      id="main-content"
+      tabIndex={-1}
       role="alert"
       className="mx-auto flex min-h-svh w-full max-w-screen-2xl items-center px-6 py-24 md:px-10"
     >

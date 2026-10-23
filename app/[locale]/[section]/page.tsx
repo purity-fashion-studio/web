@@ -72,6 +72,7 @@ export async function generateMetadata({
     path: sectionPath(entry.routeSegment),
     title: entry.seo.title,
     description: entry.seo.description,
+    image: entry.seo.image,
   })
 }
 
@@ -135,6 +136,7 @@ export default async function SectionPage({ params }: SectionPageProps) {
         title={publicPage.title}
         summary={publicPage.summary}
         items={publicPage.body}
+        editorialBlocks={publicPageData?.editorialBlocks}
         mediaAsset={publicPageData?.mediaAsset}
         action={
           publicPage.cta
@@ -156,6 +158,7 @@ export default async function SectionPage({ params }: SectionPageProps) {
         eyebrow={publicPageData.eyebrow ?? publicPageData.title}
         title={publicPageData.title}
         summary={publicPageData.summary}
+        editorialBlocks={publicPageData.editorialBlocks}
         items={
           publicPageData.sections.length
             ? publicPageData.sections.map((item) => item.body)
@@ -207,9 +210,7 @@ export default async function SectionPage({ params }: SectionPageProps) {
       ? atelierServices
       : undefined
   const [payloadCourses, payloadCollections] = await Promise.all([
-    category.slug === "school"
-      ? getPublishedCourseCards(locale)
-      : [],
+    category.slug === "school" ? getPublishedCourseCards(locale) : [],
     category.slug === "collections"
       ? getPublishedFashionCollectionCards(locale)
       : [],

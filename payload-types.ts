@@ -226,6 +226,7 @@ export interface Media {
    * Internal provenance, license, prompt or release reference. Never public.
    */
   sourceMetadata?: string | null;
+  prefix?: string | null;
   _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -1495,6 +1496,18 @@ export interface BookingRequest {
       }[]
     | null;
   message?: string | null;
+  /**
+   * Contact and selection as submitted; independent of later lead edits.
+   */
+  submissionSnapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   currency?: ('EUR' | 'UAH') | null;
   sourcePage: string;
   referrer?: string | null;
@@ -1934,6 +1947,7 @@ export interface MediaSelect<T extends boolean = true> {
   allowedUsageContexts?: T;
   rightsExpiry?: T;
   sourceMetadata?: T;
+  prefix?: T;
   _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3089,6 +3103,7 @@ export interface BookingRequestsSelect<T extends boolean = true> {
         id?: T;
       };
   message?: T;
+  submissionSnapshot?: T;
   currency?: T;
   sourcePage?: T;
   referrer?: T;

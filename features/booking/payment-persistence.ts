@@ -7,11 +7,11 @@ import {
 } from "payload"
 
 import type { PaymentOrder } from "@/payload-types"
-import { env } from "@/lib/env"
 
 import { withAdvisoryLock } from "./advisory-lock"
 import { enqueueNotifications } from "./notification-outbox"
 import { paymentNotificationMessages } from "./payment-notifications"
+import { internalNotificationMessages } from "./notification-recipients"
 import {
   canTransitionPaymentStatus,
   type PaymentOrderStatus,
@@ -107,7 +107,7 @@ export async function transitionPayment({
     try {
       const now = new Date().toISOString()
       const updated = shouldUpdateOrder
-          ? await payload.update({
+        ? await payload.update({
             collection: "payment-orders",
             id: order.id,
             context: { service },
@@ -156,17 +156,17 @@ export async function transitionPayment({
         await enqueueNotifications({
           payload,
           req,
-          messages: [
+          messages: await internalNotificationMessages(
+            payload,
             {
               bookingRequest: bookingID,
               deduplicationKey: `payment:${order.id}:disputed:internal`,
               paymentOrder: order.id,
-              recipient: env.EMAIL_FROM ?? "disabled@invalid.local",
-              recipientType: "internal",
               subject: "PURITY — payment disputed",
               text: `Order ${order.orderUUID} is disputed. Review the verified provider record in Payload Admin.`,
             },
-          ],
+            req
+          ),
         })
       }
 

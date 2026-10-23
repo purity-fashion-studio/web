@@ -41,12 +41,11 @@ const nextConfig: NextConfig = {
   },
   images: {
     unoptimized: process.env.CI === "true",
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.public.blob.vercel-storage.com",
-      },
-    ],
+    // The optimizer caches independently of Payload ACLs and ignores upstream
+    // no-store. Validate before cache lookup: even old warmed CMS URLs must fail.
+    // CMS uses its upload-time derivatives through the protected file endpoint.
+    localPatterns: [{ pathname: "/brand/**", search: "" }],
+    remotePatterns: [],
   },
 }
 

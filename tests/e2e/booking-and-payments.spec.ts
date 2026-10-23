@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test"
+import { assertIsolatedTestDatabase } from "../../scripts/test-database"
 
 const colorSchemes = ["light"] as const
 
 test("booking form validates and records inquiry-only requests", async ({
   page,
+  baseURL,
 }) => {
+  assertIsolatedTestDatabase(process.env, baseURL ?? "http://localhost:3000")
   await page.goto("/uk/services/atelier-service")
   const bookingHref = "/uk/booking?service=atelier-service"
   const serviceBookingCta = page.locator(`main a[href="${bookingHref}"]`)
@@ -141,7 +144,9 @@ test("course page retains its unconfirmed commercial status", async ({
     )
   ).toBeVisible()
   await expect(
-    page.locator('a[href="/uk/booking?service=wardrobe-management"]')
+    page.locator(
+      'a[href="/uk/booking?service=wardrobe-management&course=wardrobe-management-course"]'
+    )
   ).toHaveCount(2)
 })
 

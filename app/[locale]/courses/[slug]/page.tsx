@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditorialSections } from "@/components/editorial-sections"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -18,11 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { formatOfferPrice } from "@/content/commerce"
+
 import { getLocalizedMetadata } from "@/content/metadata"
 import { getCourseBySlug, getSiteSettings } from "@/content/public-api"
 import { coursePath } from "@/content/routes"
 import { BookingStartCta } from "@/features/booking/booking-start-cta"
+import { ProductCartControls } from "@/features/cart/product-cart-controls"
+import { ProductOfferSelection } from "@/features/cart/product-offer-selection"
 import { hasLocale, localizePath, type Locale } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
 
@@ -55,6 +58,7 @@ export async function generateMetadata({
     path: coursePath(course.routeSegment),
     title: course.seo.title,
     description: course.seo.description,
+    image: course.seo.image,
   })
 }
 
@@ -78,14 +82,14 @@ export default async function CoursePage({ params }: CoursePageProps) {
   const currentPath = coursePath(course.routeSegment)
   const bookingHref = localizePath(
     locale,
-    "/booking?service=wardrobe-management"
+    `/booking?service=wardrobe-management&course=${course.slug}`
   )
 
   return (
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath={currentPath} />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={course.eyebrow}
@@ -100,6 +104,15 @@ export default async function CoursePage({ params }: CoursePageProps) {
               label={course.cta.label}
               serviceSlug="wardrobe-management"
               variant="secondary"
+            />
+            <ProductCartControls
+              locale={locale}
+              selection={{
+                kind: "course",
+                slug: course.slug,
+                format: "studio",
+                currency: "EUR",
+              }}
             />
             <Link
               href={localizePath(locale, "/services/wardrobe-management")}
@@ -204,13 +217,19 @@ export default async function CoursePage({ params }: CoursePageProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="border-t border-border pt-5 text-sm leading-7 text-muted-foreground">
-                {course.priceNote ||
-                  course.offers
-                    .map(
-                      (offer) =>
-                        `${offer.title}: ${formatOfferPrice(offer, locale, settings.booking.pricing)}`
-                    )
-                    .join(" · ")}
+                {course.priceNote && <p>{course.priceNote}</p>}
+                <div className="grid gap-6">
+                  {course.offers.map((offer) => (
+                    <ProductOfferSelection
+                      key={offer.id}
+                      kind="course"
+                      slug={course.slug}
+                      offer={offer}
+                      locale={locale}
+                      priceLabels={settings.booking.pricing}
+                    />
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -235,6 +254,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
             </CardContent>
           </Card>
         </section>
+        <EditorialSections blocks={course.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath={currentPath} />
     </div>

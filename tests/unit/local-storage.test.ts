@@ -44,8 +44,12 @@ it("builds local Payload with actual filesystem media and no Blob credential", a
   expect(env.PAYLOAD_DISABLE_BLOB_STORAGE).toBe("true")
   expect(env.BLOB_READ_WRITE_TOKEN).toBeUndefined()
   const media = localConfig.collections.find(({ slug }) => slug === "media")
-  expect(media?.upload).toMatchObject({ staticDir: "public/media" })
+  expect(media?.upload).toMatchObject({ staticDir: ".payload-media" })
   expect(media?.upload).not.toMatchObject({ disableLocalStorage: true })
+})
+
+it("does not rewrite tracked generated contracts outside local development", () => {
+  expect(localConfig.typescript.autoGenerate).toBe(false)
 })
 
 it.each(["development", "preview", "production"])(

@@ -17,8 +17,6 @@ export function getSiteURL() {
 
 export function getPayloadURL() {
   return (
-    previewURL() ??
-    process.env.NEXT_PUBLIC_PAYLOAD_URL?.trim() ??
-    getSiteURL()
+    previewURL() ?? process.env.NEXT_PUBLIC_PAYLOAD_URL?.trim() ?? getSiteURL()
   )
 }

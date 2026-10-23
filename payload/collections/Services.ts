@@ -9,7 +9,7 @@ import {
   formatsField,
   localizedTextarea,
   localizedText,
-  publicRead,
+  publicReadWithDirection,
   stepsField,
 } from "../fields/shared"
 import { publicCollectionHooks } from "../hooks/revalidation"
@@ -31,7 +31,7 @@ export const Services: CollectionConfig = {
   access: {
     create: contentManagers,
     delete: ownerOnly,
-    read: publicRead,
+    read: publicReadWithDirection("primaryDirection"),
     readVersions: contentOrDeveloper,
     update: contentManagers,
   },

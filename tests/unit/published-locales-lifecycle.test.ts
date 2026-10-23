@@ -7,7 +7,7 @@ const { destroy, end, find, config } = vi.hoisted(() => ({
   config: {
     collections: [] as Array<{
       slug: string
-      fields: Array<{ name: string; localized: boolean; required: boolean }>
+      fields: Array<Record<string, unknown>>
     }>,
     globals: [],
   },
@@ -83,4 +83,68 @@ it("CLI exits normally after scan cleanup even when the startup client keeps poo
   expect(destroy).toHaveBeenCalledOnce()
   expect(end).toHaveBeenCalledOnce()
   expect(process.exit).toHaveBeenCalledWith(0)
+})
+
+it("checks required localized content inside SEO tabs, rows and named groups", async () => {
+  const oldExitCode = process.exitCode
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  try {
+    config.collections = [
+      {
+        slug: "services",
+        fields: [
+          {
+            type: "tabs",
+            tabs: [
+              {
+                fields: [
+                  {
+                    type: "row",
+                    fields: [
+                      {
+                        type: "text",
+                        name: "title",
+                        localized: true,
+                        required: true,
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                name: "details",
+                fields: [
+                  {
+                    type: "text",
+                    name: "description",
+                    localized: true,
+                    required: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    find.mockResolvedValueOnce({
+      docs: [
+        {
+          id: "incomplete",
+          title: { uk: "Назва" },
+          details: { description: { uk: "Опис" } },
+        },
+      ],
+    })
+    await import("../../scripts/check-published-locales")
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("services:incomplete:title:ru,en")
+    )
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("services:incomplete:details.description:ru,en")
+    )
+  } finally {
+    process.exitCode = oldExitCode
+  }
 })

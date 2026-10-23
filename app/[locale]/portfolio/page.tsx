@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { EditorialSections } from "@/components/editorial-sections"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -46,6 +47,7 @@ export async function generateMetadata({
     path: "/portfolio",
     title: page.seo.title,
     description: page.seo.description,
+    image: page.seo.image,
   })
 }
 
@@ -68,7 +70,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
     <div className="min-h-svh bg-background text-foreground">
       <SiteHeader locale={locale} currentPath="/portfolio" />
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <EditorialHero
           locale={locale}
           eyebrow={page.eyebrow ?? page.title}
@@ -273,6 +275,7 @@ export default async function PortfolioPage({ params }: PortfolioPageProps) {
             </Link>
           </div>
         </section>
+        <EditorialSections blocks={page.editorialBlocks} locale={locale} />
       </main>
       <SiteFooter locale={locale} currentPath="/portfolio" />
     </div>
