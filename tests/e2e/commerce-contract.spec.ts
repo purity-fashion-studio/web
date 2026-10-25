@@ -238,6 +238,72 @@ async function submit(page: Page, marker: string, fromCart = true) {
   return saved.docs[0]!
 }
 
+test("empty-cart catalogue CTA opens the published stylist page in every locale and width", async ({
+  page,
+}) => {
+  test.setTimeout(60000)
+  const errors: string[] = []
+  page.on("console", (message) => {
+    if (message.type() === "error")
+      errors.push(`${page.url()}: ${message.text()}`)
+  })
+  page.on("pageerror", (error) => errors.push(error.stack ?? error.message))
+  await page.addInitScript(() => localStorage.removeItem("purity-cart-v1"))
+
+  for (const [locale, title, empty, browse] of [
+    ["uk", "Ваш вибір", "Ваш кошик порожній.", "Переглянути послуги"],
+    ["ru", "Ваш выбор", "Ваша корзина пуста.", "Посмотреть услуги"],
+    ["en", "Your selection", "Your cart is empty.", "Explore services"],
+  ] as const) {
+    const directions = await payload.find({
+      collection: "directions",
+      locale,
+      fallbackLocale: false,
+      draft: false,
+      depth: 0,
+      overrideAccess: false,
+      where: { slug: { equals: "stylist" } },
+    })
+    expect(directions.docs).toHaveLength(1)
+    const direction = directions.docs[0]!
+    expect(direction.canonicalKey).toBe("research")
+    expect(direction.title).toBeTruthy()
+
+    for (const width of [320, 390, 768, 1440]) {
+      await test.step(`${locale} at ${width}px`, async () => {
+        await page.setViewportSize({
+          width,
+          height: width === 768 ? 1024 : 900,
+        })
+        const response = await page.goto(`/${locale}/cart`)
+        expect(response?.status()).toBe(200)
+        const main = page.getByRole("main")
+        await expect(
+          main.getByRole("heading", { level: 1, name: title, exact: true })
+        ).toBeVisible()
+        await expect(main.getByText(empty, { exact: true })).toBeVisible()
+        await expect(page.getByTestId("cart-item")).toHaveCount(0)
+        await main.getByRole("link", { name: browse, exact: true }).click()
+        // The public slug is the contract, not the direction's canonical key.
+        await expect(page).toHaveURL(
+          (url) =>
+            url.pathname === `/${locale}/stylist` && !url.search && !url.hash
+        )
+        await expect(
+          page.getByRole("heading", {
+            level: 1,
+            name: direction.title,
+            exact: true,
+          })
+        ).toBeVisible()
+        await expect(page.getByTestId("not-found")).toHaveCount(0)
+        expect(errors).toEqual([])
+      })
+    }
+  }
+  expect(errors).toEqual([])
+})
+
 test("Atelier uses its CMS service editorial content and both booking targets in every locale", async ({
   page,
 }) => {
