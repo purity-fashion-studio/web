@@ -47,7 +47,7 @@ export function CartView({
       <div className="grid gap-6">
         <p>{copy.empty}</p>
         <Link
-          href={localizePath(locale, "/research")}
+          href={localizePath(locale, "/stylist")}
           className={buttonVariants({ variant: "outline", size: "lg" })}
         >
           {copy.browse}

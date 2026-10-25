@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { commerceLabel } from "@/content/commerce"
 import { EditorialSections } from "@/components/editorial-sections"
 
 import {
@@ -493,7 +494,13 @@ export function CollectionsPageView({
                           {direction.materialsLabel}
                         </p>
                         <p>{collection.materials.join(" · ")}</p>
-                        <p>{collection.commercialStatus}</p>
+                        <p>
+                          {commerceLabel(
+                            locale,
+                            "status",
+                            collection.commercialStatus
+                          )}
+                        </p>
                         <p>{collection.priceNote}</p>
                       </CardContent>
                     </Card>

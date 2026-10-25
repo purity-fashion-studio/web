@@ -13,6 +13,11 @@ assert.equal(canTransitionPaymentStatus("paid", "partially-refunded"), true)
 assert.equal(canTransitionPaymentStatus("partially-refunded", "refunded"), true)
 assert.equal(canTransitionPaymentStatus("refunded", "paid"), false)
 assert.equal(canTransitionPaymentStatus("expired", "paid"), true)
-assert.equal(canTransitionPaymentStatus("disputed", "refunded"), true)
+assert.equal(canTransitionPaymentStatus("disputed", "refunded"), false)
+assert.equal(
+  canTransitionPaymentStatus("disputed", "partially-refunded"),
+  false
+)
+assert.equal(canTransitionPaymentStatus("disputed", "disputed"), true)
 
 console.log("Payment contract ok: routing and monotonic status transitions")

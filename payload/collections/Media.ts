@@ -1,4 +1,4 @@
-import type { CollectionConfig, Where } from "payload"
+import { ValidationError, type CollectionConfig, type Where } from "payload"
 
 import {
   contentManagers,
@@ -49,8 +49,9 @@ export const Media: CollectionConfig = {
     afterChange: [revalidateMedia],
     afterDelete: [revalidateDeletedMedia],
     beforeValidate: [
-      ({ data }) => {
+      ({ data, req }) => {
         if (!data) return data
+        const errors: Array<{ message: string; path: string }> = []
 
         if (data.source === "generated") {
           data.isRealClientProof = false
@@ -58,12 +59,18 @@ export const Media: CollectionConfig = {
             !data.replacementPriority ||
             data.replacementPriority === "none"
           ) {
-            throw new Error("Generated media requires a replacement priority.")
+            errors.push({
+              path: "replacementPriority",
+              message: "Generated media requires a replacement priority.",
+            })
           }
         }
 
         if (data.publicVisibility && data.usageRightsStatus !== "approved") {
-          throw new Error("Public media requires approved usage rights.")
+          errors.push({
+            path: "usageRightsStatus",
+            message: "Public media requires approved usage rights.",
+          })
         }
 
         if (
@@ -71,13 +78,21 @@ export const Media: CollectionConfig = {
           data.rightsExpiry &&
           new Date(data.rightsExpiry).valueOf() <= Date.now()
         ) {
-          throw new Error("Public media cannot use expired rights.")
+          errors.push({
+            path: "rightsExpiry",
+            message: "Public media cannot use expired rights.",
+          })
         }
 
         if (data.isRealClientProof && data.source !== "client") {
-          throw new Error("Real client proof must use source=client.")
+          errors.push({
+            path: "source",
+            message: "Real client proof must use source=client.",
+          })
         }
 
+        if (errors.length)
+          throw new ValidationError({ collection: "media", errors, req }, req.t)
         return data
       },
     ],
@@ -129,6 +144,10 @@ export const Media: CollectionConfig = {
           required: true,
           defaultValue: "pending",
           options: ["pending", "approved", "restricted", "expired"],
+          admin: {
+            description:
+              "Public visibility requires approved, unexpired usage rights.",
+          },
         },
         {
           name: "modelReleaseStatus",
@@ -151,6 +170,10 @@ export const Media: CollectionConfig = {
         {
           name: "isRealClientProof",
           type: "checkbox",
+          admin: {
+            description:
+              "Only client-source images may be real client proof; generated images never qualify.",
+          },
           required: true,
           defaultValue: false,
         },
@@ -160,6 +183,10 @@ export const Media: CollectionConfig = {
           required: true,
           defaultValue: "none",
           options: ["none", "replace-before-launch", "replace-when-approved"],
+          admin: {
+            description:
+              "Generated images require a replacement priority other than none.",
+          },
         },
       ],
     },

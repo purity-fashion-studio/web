@@ -36,38 +36,41 @@ assert.throws(() =>
   })
 )
 assert.equal(migrations.at(-1)?.name, migrationHead)
-assert.deepEqual(
-  await enforcePublishedGlobalRead({
-    args: { draft: true },
-    operation: "read",
-    req: { user: null },
-  } as never),
-  { draft: false }
-)
+for (const user of [null, { active: false, roles: ["editor"] }]) {
+  await assert.rejects(
+    async () =>
+      enforcePublishedGlobalRead({
+        args: { draft: true },
+        operation: "read",
+        overrideAccess: false,
+        req: { user },
+      } as never),
+    { status: 403 }
+  )
+}
 assert.deepEqual(
   await enforcePublishedGlobalRead({
     args: {},
     operation: "read",
+    overrideAccess: false,
     req: { user: null },
   } as never),
-  { draft: false }
+  {}
 )
-assert.deepEqual(
-  await enforcePublishedGlobalRead({
-    args: { draft: true },
-    operation: "read",
-    req: { user: { active: false, roles: ["editor"] } },
-  } as never),
-  { draft: false }
-)
-assert.deepEqual(
-  await enforcePublishedGlobalRead({
-    args: { draft: true },
-    operation: "read",
-    req: { user: { active: true, roles: ["editor"] } },
-  } as never),
-  { draft: true }
-)
+for (const [user, overrideAccess] of [
+  [{ active: true, roles: ["editor"] }, false],
+  [null, true],
+]) {
+  assert.deepEqual(
+    await enforcePublishedGlobalRead({
+      args: { draft: true },
+      operation: "read",
+      overrideAccess,
+      req: { user },
+    } as never),
+    { draft: true }
+  )
+}
 assert.throws(() =>
   assertTargetResourceIdentity("preview", {
     ...preview,

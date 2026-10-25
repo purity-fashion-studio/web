@@ -1,6 +1,9 @@
 import { formatOfferPrice, type OfferPriceLabels } from "@/content/commerce"
 import type { ServiceOffer } from "@/content/public-api"
-import { defaultOfferFormat } from "@/features/booking/offer-eligibility"
+import {
+  defaultOfferFormat,
+  supportedOfferFormats,
+} from "@/features/booking/offer-eligibility"
 import type { Locale } from "@/i18n/routing"
 
 import { ProductCartControls } from "./product-cart-controls"
@@ -30,6 +33,7 @@ export function ProductOfferSelection({
       </h3>
       <ProductCartControls
         locale={locale}
+        allowedFormats={supportedOfferFormats(offer)}
         selection={{
           kind,
           slug,

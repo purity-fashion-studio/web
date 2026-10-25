@@ -6,6 +6,7 @@ import type * as React from "react"
 
 import "../globals.css"
 import { Analytics } from "@/components/analytics"
+import { DocumentCSPProvider } from "@/components/document-csp-provider"
 import { PreviewBanner } from "@/components/preview-banner"
 import { SkipLink } from "@/components/skip-link"
 import { StructuredData } from "@/components/structured-data"
@@ -119,7 +120,7 @@ export default async function LocaleLayout({
           ]}
         />
         <PreviewBanner locale={locale} />
-        {children}
+        <DocumentCSPProvider nonce={nonce}>{children}</DocumentCSPProvider>
         <Analytics nonce={nonce} />
       </body>
     </html>

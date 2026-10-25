@@ -1,5 +1,16 @@
+import { getInterfaceCopy } from "../i18n/messages"
 import type { ServiceOffer } from "./public-api"
 import type { Locale } from "../i18n/routing"
+
+export function commerceLabel(
+  locale: Locale,
+  group: "status" | "format" | "checkout",
+  value: string
+) {
+  const labels: Record<string, string> =
+    getInterfaceCopy(locale).Commerce[group]
+  return Object.hasOwn(labels, value) ? labels[value] : value
+}
 
 const numberLocales: Record<Locale, string> = {
   uk: "uk-UA",
@@ -13,7 +24,7 @@ export type OfferPriceLabels = {
 }
 
 export function formatOfferPrice(
-  offer: ServiceOffer,
+  offer: Pick<ServiceOffer, "pricingMode" | "prices">,
   locale: Locale,
   labels: OfferPriceLabels
 ) {

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { getPayload } from "payload"
 
 import config from "../payload.config"
+import { processNormalizedPaymentWebhook } from "../features/booking/payment-webhook-processing"
 import { transitionPayment } from "../features/booking/payment-persistence"
 import { processWebhookEvent } from "../features/booking/webhook-events"
 import { assertIsolatedTestDatabase } from "./test-database"
@@ -139,30 +140,112 @@ try {
   })
   assert.equal(paidOutbox.totalDocs, 2)
 
-  await transitionPayment({
-    payload,
-    orderID: order.id,
-    service: "stripe-webhook",
-    transition: { status: "partially-refunded", refundedAmount: 100 },
-    notificationStatus: "refunded",
-    notificationDedupe: "partially-refunded:100",
-  })
-  await transitionPayment({
-    payload,
-    orderID: order.id,
-    service: "stripe-webhook",
-    transition: { status: "partially-refunded", refundedAmount: 200 },
-    notificationStatus: "refunded",
-    notificationDedupe: "partially-refunded:200",
-  })
-  await transitionPayment({
-    payload,
-    orderID: order.id,
-    service: "stripe-webhook",
-    transition: { status: "refunded", refundedAmount: 1_000 },
-    notificationStatus: "refunded",
-    notificationDedupe: "refunded:1000",
-  })
+  for (const [index, eventType] of [
+    "charge.dispute.created",
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+  ].entries()) {
+    const providerEventID = `evt-ordering-${suffix}-${index}`
+    const normalizedPayload = {
+      orderUUID: suffix,
+      amount: 1_000,
+      currency: "EUR",
+      paymentStatus: "paid",
+    }
+    const process = () =>
+      processNormalizedPaymentWebhook({
+        payload,
+        provider: "stripe",
+        eventType,
+        normalizedPayload,
+      })
+    await processWebhookEvent({
+      payload,
+      provider: "stripe",
+      providerEventID,
+      eventType,
+      normalizedPayload,
+      payloadHash: suffix.replaceAll("-", ""),
+      process,
+    })
+    const event = await payload.find({
+      collection: "webhook-events",
+      overrideAccess: true,
+      where: { providerEventID: { equals: providerEventID } },
+    })
+    created.webhookEvents.push(event.docs[0]!.id)
+    if (index === 0) {
+      const replay = await processWebhookEvent({
+        payload,
+        provider: "stripe",
+        providerEventID,
+        eventType,
+        normalizedPayload,
+        payloadHash: suffix.replaceAll("-", ""),
+        process,
+      })
+      assert.equal(replay.duplicate, true)
+    }
+    assert.equal(
+      (
+        await payload.findByID({
+          collection: "payment-orders",
+          id: order.id,
+          overrideAccess: true,
+        })
+      ).status,
+      "disputed"
+    )
+  }
+
+  for (const [amount, expectedRefund] of [
+    [100, 100],
+    [200, 200],
+    [100, 200],
+    [1000, 1000],
+    [400, 1000],
+  ]) {
+    await processNormalizedPaymentWebhook({
+      payload,
+      provider: "stripe",
+      eventType: "charge.refunded",
+      normalizedPayload: { orderUUID: suffix, amount, currency: "EUR" },
+    })
+    for (const eventType of [
+      "checkout.session.completed",
+      "checkout.session.async_payment_succeeded",
+    ]) {
+      await processNormalizedPaymentWebhook({
+        payload,
+        provider: "stripe",
+        eventType,
+        normalizedPayload: {
+          orderUUID: suffix,
+          amount: 1000,
+          currency: "EUR",
+          paymentStatus: "paid",
+        },
+      })
+    }
+    const current = await payload.findByID({
+      collection: "payment-orders",
+      id: order.id,
+      overrideAccess: true,
+    })
+    assert.equal(current.status, "disputed")
+    assert.equal(current.refundedAmount, expectedRefund)
+    assert.equal(current.safeFailureCode, "disputed")
+    assert.equal(
+      (
+        await payload.findByID({
+          collection: "booking-requests",
+          id: booking.id,
+          overrideAccess: true,
+        })
+      ).status,
+      "confirmed"
+    )
+  }
   const staleFailure = await transitionPayment({
     payload,
     orderID: order.id,
@@ -170,14 +253,6 @@ try {
     transition: { status: "failed", safeFailureCode: "out-of-order" },
   })
   assert.equal(staleFailure.applied, false)
-  const refundedOrder = await payload.findByID({
-    collection: "payment-orders",
-    id: order.id,
-    depth: 0,
-    overrideAccess: true,
-  })
-  assert.equal(refundedOrder.status, "refunded")
-  assert.equal(refundedOrder.refundedAmount, 1_000)
 
   let concurrentExecutions = 0
   const concurrentEventID = `evt-concurrent-${suffix}`
@@ -250,7 +325,7 @@ try {
   if (retryEvent.docs[0]) created.webhookEvents.push(retryEvent.docs[0].id)
 
   console.log(
-    "Payment reliability ok: 20-way transition/event concurrency, replay, outbox dedupe and monotonic refunds"
+    "Payment reliability ok: 20-way transition/event concurrency, replay, disputed-event ordering, outbox dedupe and monotonic refunds"
   )
 } catch (error) {
   failure = error

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 
 type LocaleErrorProps = {
   error: Error & { digest?: string }
-  reset: () => void
+  retry: () => void
 }
 
 const copy = {
@@ -30,7 +30,7 @@ const copy = {
   },
 } as const
 
-export default function LocaleError({ error, reset }: LocaleErrorProps) {
+export default function LocaleError({ error, retry }: LocaleErrorProps) {
   const pathname = usePathname()
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function LocaleError({ error, reset }: LocaleErrorProps) {
       <div className="grid max-w-xl gap-4">
         <h1 className="font-heading text-4xl leading-tight">{text.title}</h1>
         <p className="text-muted-foreground">{text.description}</p>
-        <Button type="button" onClick={() => reset()} className="w-fit">
+        <Button type="button" onClick={() => retry()} className="w-fit">
           {text.retry}
         </Button>
       </div>

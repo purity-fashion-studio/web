@@ -16,6 +16,7 @@ import {
   paymentCurrencies,
   type BookingFormat,
 } from "@/features/booking/schema"
+import { BookingStartCta } from "@/features/booking/booking-start-cta"
 import { getInterfaceCopy } from "@/i18n/messages"
 import { localizePath, type Locale } from "@/i18n/routing"
 
@@ -28,9 +29,13 @@ export function AddToCart({
   formatLabels,
   formatLabel,
   currencyLabel,
+  allowedFormats,
+  bookingCTA,
 }: {
   locale: Locale
   selection: CartSelection
+  allowedFormats?: readonly BookingFormat[]
+  bookingCTA?: { label: string; serviceSlug: string }
   formatLabels: Record<BookingFormat, string>
   formatLabel: string
   currencyLabel: string
@@ -39,6 +44,8 @@ export function AddToCart({
   const [error, setError] = useState(false)
   const [format, setFormat] = useState(selection.format)
   const [currency, setCurrency] = useState(selection.currency)
+  const formatOptions =
+    allowedFormats ?? (selection.offerId ? [selection.format] : formats)
   const currentSelection = { ...selection, format, currency }
   const copy = getInterfaceCopy(locale).Cart
   const added = cart.some(
@@ -47,14 +54,14 @@ export function AddToCart({
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap gap-3">
-        {!selection.offerId && (
+        {formatOptions.length > 1 && (
           <Select
             value={format}
             onValueChange={(value) => {
-              if (formats.includes(value as BookingFormat))
+              if (formatOptions.includes(value as BookingFormat))
                 setFormat(value as BookingFormat)
             }}
-            items={formats.map((value) => ({
+            items={formatOptions.map((value) => ({
               value,
               label: formatLabels[value],
             }))}
@@ -63,7 +70,7 @@ export function AddToCart({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {formats.map((value) => (
+              {formatOptions.map((value) => (
                 <SelectItem key={value} value={value}>
                   {formatLabels[value]}
                 </SelectItem>
@@ -91,6 +98,16 @@ export function AddToCart({
         </Select>
       </div>
       <div className="flex flex-wrap items-center gap-3">
+        {bookingCTA && selection.offerId && (
+          <BookingStartCta
+            href={localizePath(
+              locale,
+              `/booking?${new URLSearchParams({ service: selection.slug, offer: selection.offerId, format, currency })}`
+            )}
+            label={bookingCTA.label}
+            serviceSlug={bookingCTA.serviceSlug}
+          />
+        )}
         <Button
           type="button"
           variant="outline"

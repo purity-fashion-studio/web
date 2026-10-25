@@ -9,6 +9,7 @@ import {
   publicCollectionHooks,
   revalidateTestimonials,
   revalidateDeletedTestimonial,
+  revalidateGlobal,
 } from "@/payload/hooks/revalidation"
 
 beforeEach(() => {
@@ -32,6 +33,13 @@ it.each(["services", "courses", "fashion-collections", "portfolio-cases"])(
     expect(revalidateTag).toHaveBeenCalledWith("cms:editorial", { expire: 0 })
   }
 )
+
+it("invalidates the cached shared maintenance notice on Site Settings changes", async () => {
+  await revalidateGlobal("site-settings")({
+    doc: { maintenance: { enabled: true, message: "Maintenance" } },
+  } as never)
+  expect(revalidateTag).toHaveBeenCalledWith("cms:site-settings", { expire: 0 })
+})
 
 it("invalidates supplementary testimonials when consent changes or a testimonial is deleted", async () => {
   for (const hook of [revalidateTestimonials, revalidateDeletedTestimonial]) {

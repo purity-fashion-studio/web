@@ -14,7 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { formatOfferPrice, type OfferPriceLabels } from "@/content/commerce"
+import {
+  commerceLabel,
+  formatOfferPrice,
+  type OfferPriceLabels,
+} from "@/content/commerce"
 import { getLocalizedMetadata } from "@/content/metadata"
 import {
   getServiceBySlug,
@@ -24,7 +28,10 @@ import {
 import { servicePath } from "@/content/routes"
 import { BookingStartCta } from "@/features/booking/booking-start-cta"
 import { ProductCartControls } from "@/features/cart/product-cart-controls"
-import { defaultOfferFormat } from "@/features/booking/offer-eligibility"
+import {
+  defaultOfferFormat,
+  supportedOfferFormats,
+} from "@/features/booking/offer-eligibility"
 import { hasLocale, localizePath, type Locale } from "@/i18n/routing"
 
 const faqTitles = {
@@ -237,19 +244,22 @@ function ServiceDetailPage({
                         {formatOfferPrice(offer, locale, pricingLabels)}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {offer.format} · {offer.checkoutMode} ·{" "}
-                        {offer.commercialStatus}
-                      </p>
-                      <BookingStartCta
-                        href={localizePath(
+                        {commerceLabel(locale, "format", offer.format)} ·{" "}
+                        {commerceLabel(locale, "checkout", offer.checkoutMode)}{" "}
+                        ·{" "}
+                        {commerceLabel(
                           locale,
-                          `/booking?service=${service.routeSegment}&offer=${offer.id}&format=${defaultOfferFormat(offer)}`
+                          "status",
+                          offer.commercialStatus
                         )}
-                        label={service.cta.label}
-                        serviceSlug={service.slug}
-                      />
+                      </p>
                       <ProductCartControls
                         locale={locale}
+                        allowedFormats={supportedOfferFormats(offer)}
+                        bookingCTA={{
+                          label: service.cta.label,
+                          serviceSlug: service.slug,
+                        }}
                         selection={{
                           kind: "service",
                           slug: service.slug,

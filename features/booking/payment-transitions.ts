@@ -19,7 +19,7 @@ const transitions: Record<PaymentOrderStatus, readonly PaymentOrderStatus[]> = {
   expired: ["paid"],
   "partially-refunded": ["refunded", "disputed"],
   refunded: ["disputed"],
-  disputed: ["paid", "partially-refunded", "refunded"],
+  disputed: [],
 }
 
 export function canTransitionPaymentStatus(

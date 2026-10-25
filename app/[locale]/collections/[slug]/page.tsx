@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { commerceLabel } from "@/content/commerce"
 import { EditorialSections } from "@/components/editorial-sections"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -252,7 +253,7 @@ function CollectionDetailPage({
                   {collection.availabilityTitle}
                 </CardTitle>
                 <CardDescription className="min-w-0 break-words">
-                  {collection.availability}
+                  {commerceLabel(locale, "status", collection.availability)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="border-t border-border pt-5 text-sm leading-7 text-muted-foreground">

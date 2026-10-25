@@ -134,7 +134,7 @@ test("course page retains its unconfirmed commercial status", async ({
   await expect(
     page.getByText("Фіксована пропозиція", { exact: true })
   ).toBeVisible()
-  await expect(page.getByText(/coming-soon/)).toBeVisible()
+  await expect(page.getByText("Незабаром", { exact: true })).toBeVisible()
   await expect(
     page.getByText(/Курс управління гардеробом: за запитом/)
   ).toBeVisible()

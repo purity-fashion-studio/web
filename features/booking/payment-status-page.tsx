@@ -46,7 +46,10 @@ async function PaymentStatusPage({
   // remains on one of the three public status routes. Navigation must retain
   // that physical route so Next never prefetches an unimplemented
   // /payment/pending or /payment/refunded page.
-  const currentPath = `/payment/${status}`
+  const receiptQuery = new URLSearchParams()
+  if (verified.orderReference)
+    receiptQuery.set("order", verified.orderReference)
+  const currentPath = `/payment/${status}${receiptQuery.size ? `?${receiptQuery}` : ""}`
   const verifiedProvider = verified.provider ?? provider
   const providerValue = isPaymentProvider(verifiedProvider)
     ? settings.booking.providers[verifiedProvider]

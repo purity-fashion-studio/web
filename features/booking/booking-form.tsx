@@ -239,6 +239,7 @@ function BookingForm({
   }
 
   async function onSubmit(values: BookingInput) {
+    if (result.status === "success" && !result.checkoutUnavailable) return
     const formData = new FormData()
 
     formData.set("locale", locale)
@@ -290,11 +291,6 @@ function BookingForm({
         () => ({ status: "error", message: "serviceUnavailable" }) as const
       )
       if (nextResult.status === "success") {
-        // An unavailable checkout retries the saved request, not a new order.
-        if (!nextResult.checkoutUnavailable) {
-          setIdempotencyKey(crypto.randomUUID())
-          setSubmissionStartedAt(Date.now())
-        }
         trackBookingEvent({
           event: "booking_submit",
           serviceSlug: values.serviceSlug,
@@ -758,7 +754,10 @@ function BookingForm({
         type="submit"
         variant="default"
         size="lg"
-        disabled={isPending}
+        disabled={
+          isPending ||
+          (result.status === "success" && !result.checkoutUnavailable)
+        }
         className="w-full md:w-fit"
         data-testid="booking-submit"
       >
@@ -771,6 +770,22 @@ function BookingForm({
             ? getInterfaceCopy(locale).BookingMessages.retryCheckout
             : copy.submit}
       </Button>
+      {result.status === "success" && !result.checkoutUnavailable && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full md:w-fit"
+          data-testid="booking-new-request"
+          onClick={() => {
+            form.reset()
+            setResult({ status: "idle" })
+            setIdempotencyKey(crypto.randomUUID())
+            setSubmissionStartedAt(Date.now())
+          }}
+        >
+          {getInterfaceCopy(locale).BookingMessages.newRequest}
+        </Button>
+      )}
     </form>
   )
 }

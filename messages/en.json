@@ -1,4 +1,9 @@
 {
+  "NotFound": {
+    "title": "Page not found",
+    "description": "This page is unavailable or no longer published.",
+    "home": "Back to home"
+  },
   "Cart": {
     "title": "Your selection",
     "link": "Cart",
@@ -17,11 +22,39 @@
     "selected": "Selected offer"
   },
   "BookingMessages": {
+    "newRequest": "Start a new request",
     "checkoutUnavailable": "Your request is saved, but checkout is unavailable. Try again to continue the same request; no payment has been confirmed.",
     "retryCheckout": "Retry checkout",
     "serviceUnavailable": "We could not save your request. Please try again or contact the studio directly.",
     "rateLimit": "Too many requests. Please wait before trying again.",
     "selectionUnavailable": "The selected offer is unavailable. Return to your cart and choose again."
+  },
+  "Commerce": {
+    "status": {
+      "active": "Available",
+      "available": "Available",
+      "coming-soon": "Coming soon",
+      "waitlist": "Waiting list",
+      "paused": "Temporarily unavailable",
+      "sold-out": "Sold out",
+      "retired": "No longer offered",
+      "archived": "Archived",
+      "inquiry": "On request"
+    },
+    "format": {
+      "online": "Online",
+      "studio": "Studio",
+      "remote-atelier": "Remote atelier",
+      "in-person": "In person",
+      "hybrid": "Hybrid"
+    },
+    "checkout": {
+      "instant-payment": "Pay online",
+      "deposit": "Deposit",
+      "booking-request": "Booking request",
+      "inquiry": "Inquiry",
+      "waitlist": "Waiting list"
+    }
   },
   "System": {
     "generatedImage": "Generated editorial image",

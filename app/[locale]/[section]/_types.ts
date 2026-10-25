@@ -1,6 +1,10 @@
 import type { MediaAsset } from "@/content/media"
 import type { EditorialBlock } from "@/content/editorial"
-import type { DirectionPageData, PublicPageData } from "@/content/public-api"
+import type {
+  DirectionPageData,
+  PublicPageData,
+  ServicePageData,
+} from "@/content/public-api"
 
 export type PublicPagePresentation = {
   slug: string
@@ -70,6 +74,24 @@ export function toCategoryPagePresentation(
       question: item.question,
       answer: item.answer,
     })),
+  }
+}
+
+export function toServiceCategoryPresentation(
+  service: ServicePageData
+): CategoryPagePresentation {
+  return {
+    ctaService: service.slug,
+    editorialBlocks: service.editorialBlocks,
+    heroNote: service.intro || service.summary,
+    processTitle: service.processTitle,
+    processSteps: service.process,
+    formatsTitle: service.formatsTitle,
+    formats: service.formats.map((format) => `${format.title}: ${format.text}`),
+    outcomesTitle: service.outcomeTitle,
+    outcomes: service.outcomes,
+    ctaTitle: service.nextStepTitle,
+    ctaSummary: service.nextStepSummary,
   }
 }
 
