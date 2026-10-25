@@ -446,6 +446,13 @@ test("hybrid offers allow online selection through the product UI, cart reload a
     locale: "en",
     overrideAccess: true,
   })
+  const publishedService = await payload.findByID({
+    collection: "services",
+    id: fixtureID,
+    locale: "en",
+    draft: false,
+    overrideAccess: false,
+  })
   // Use the existing CMS preview integration to invoke the real router.refresh,
   // without a test endpoint, a browser-global patch or framework internals.
   // Draft mode also requires an authenticated content reader; the preview
@@ -546,6 +553,8 @@ test("hybrid offers allow online selection through the product UI, cart reload a
   ).toBeGreaterThan(0)
   const initialFormat = await format.textContent()
   await format.click()
+  await expect(format).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("listbox")).toBeVisible()
   await expect(scrollbarStyle).toHaveCount(1)
   // Report every console/page error, including CSP refusals, before inspecting
   // the stylesheet; the final assertion also covers the rest of commerce.
@@ -557,21 +566,49 @@ test("hybrid offers allow online selection through the product UI, cart reload a
     }))
   ).toEqual({ nonce, rules: 2 })
   await page.keyboard.press("Escape")
+  await expect(format).toHaveAttribute("aria-expanded", "false")
   await expect(page.getByRole("listbox")).toHaveCount(0)
   await expect(format).toHaveText(initialFormat!)
   await format.click()
+  await expect(format).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("listbox")).toBeVisible()
   await page
     .getByRole("option", { name: settings.booking.formats.online, exact: true })
     .click()
+  await expect(format).toHaveAttribute("aria-expanded", "false")
   await expect(format).toContainText(settings.booking.formats.online)
   await format.click()
+  await expect(format).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("listbox")).toBeVisible()
   await page.keyboard.press("Escape")
+  await expect(format).toHaveAttribute("aria-expanded", "false")
   await expect(page.getByRole("listbox")).toHaveCount(0)
   await expect(format).toContainText(settings.booking.formats.online)
-  const exitPreview = await page.request.post("/api/exit-preview", {
-    maxRedirects: 0,
-  })
+  // Prove dismissal restores pointer access before navigation can clear a modal.
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(
+    documentTimeOrigin
+  )
+  await hybridCard.getByTestId("add-to-cart").click({ trial: true })
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(
+    documentTimeOrigin
+  )
+  const [exitPreview] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/exit-preview" &&
+        response.request().method() === "POST" &&
+        response.request().isNavigationRequest()
+    ),
+    page.getByRole("button", { name: "Exit preview", exact: true }).click(),
+  ])
   expect(exitPreview.status()).toBe(303)
+  const exitURL = new URL("/uk", exitPreview.url()).href
+  expect(exitPreview.headers()["location"]).toBe(exitURL)
+  await expect(page).toHaveURL(exitURL)
+  await expect(page.locator('form[action="/api/exit-preview"]')).toHaveCount(0)
+  await expect(
+    page.getByText("Увімкнено preview чернетки", { exact: true })
+  ).toHaveCount(0)
   expect(
     (await page.context().cookies()).some(
       (cookie) => cookie.name === "__prerender_bypass"
@@ -595,6 +632,28 @@ test("hybrid offers allow online selection through the product UI, cart reload a
   expect(logout.previousUserID).toBe(previewUser.id)
   expect(logout.status).toBe(200)
   expect(logout.user).toBeNull()
+  const publishedResponse = await page.goto(`/en/services/${slug}`)
+  expect(publishedResponse?.status()).toBe(200)
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: publishedService.title,
+      exact: true,
+    })
+  ).toBeVisible()
+  await expect(page.locator('form[action="/api/exit-preview"]')).toHaveCount(0)
+  await expect(
+    page.getByText("Draft preview is enabled", { exact: true })
+  ).toHaveCount(0)
+  // Native preview exit replaced the document; reselect the unsaved format.
+  await format.click()
+  await expect(format).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("listbox")).toBeVisible()
+  await page
+    .getByRole("option", { name: settings.booking.formats.online, exact: true })
+    .click()
+  await expect(format).toHaveAttribute("aria-expanded", "false")
+  await expect(format).toContainText(settings.booking.formats.online)
   await hybridCard.getByTestId("add-to-cart").click()
   await hybridCard.getByTestId("view-cart").click()
   await expect(page.getByTestId("cart-item")).toHaveCount(1)
@@ -624,9 +683,12 @@ test("hybrid offers allow online selection through the product UI, cart reload a
   })
   await page.goto(`/en/services/${slug}`)
   await hybridCard.getByRole("combobox").first().click()
+  await expect(format).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("listbox")).toBeVisible()
   await page
     .getByRole("option", { name: settings.booking.formats.online, exact: true })
     .click()
+  await expect(format).toHaveAttribute("aria-expanded", "false")
   const direct = hybridCard.locator(`a[href*="offer=${hybrid}"]`)
   await expect(direct).toHaveAttribute("href", /format=online/)
   await direct.click()
