@@ -1,6 +1,6 @@
 import type { Offer } from "@/payload-types"
 
-import type { BookingFormat } from "./schema"
+import { formats, type BookingFormat } from "./schema"
 
 export function defaultOfferFormat(
   offer: Pick<Offer, "format">
@@ -22,6 +22,10 @@ export function isOfferFormatCompatible(
     offer.format === "hybrid" ||
     (offer.format === "in-person" && format === "studio")
   )
+}
+
+export function supportedOfferFormats(offer: Pick<Offer, "format">) {
+  return formats.filter((format) => isOfferFormatCompatible(offer, format))
 }
 
 export function isOfferCheckoutEligible(offer: Offer, now = Date.now()) {

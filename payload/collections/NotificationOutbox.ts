@@ -1,9 +1,9 @@
 import type { CollectionConfig } from "payload"
 
-import { hasRole, ownerOnly } from "../access"
+import { hasRole, ownerFieldOnly, ownerOnly } from "../access"
 
 const operationsReaders = ({ req }: { req: { user?: unknown } }) =>
-  hasRole(req.user, ["owner", "support", "finance", "developer"])
+  hasRole(req.user, ["owner", "support", "finance"])
 
 export const NotificationOutbox: CollectionConfig = {
   slug: "notification-outbox",
@@ -42,7 +42,7 @@ export const NotificationOutbox: CollectionConfig = {
       name: "recipient",
       type: "email",
       required: true,
-      access: { read: ({ req }) => hasRole(req.user, ["owner", "developer"]) },
+      access: { read: ownerFieldOnly },
     },
     { name: "subject", type: "text", required: true, maxLength: 500 },
     { name: "text", type: "textarea", required: true, maxLength: 20_000 },

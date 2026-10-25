@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto"
+const notFoundCopy = {
+  uk: { title: "Сторінку не знайдено", home: "На головну" },
+  ru: { title: "Страница не найдена", home: "На главную" },
+  en: { title: "Page not found", home: "Back to home" },
+} as const
 import { readFile } from "node:fs/promises"
 import {
   expect,
@@ -256,7 +261,12 @@ async function expectMissingPage(
   expect([200, 404]).toContain(response.status())
   const html = await response.text()
   expect(html.includes("NEXT_HTTP_ERROR_FALLBACK;404")).toBe(true)
-  expect(html.includes("This page could not be found.")).toBe(true)
+  expect(html).toContain(notFoundCopy[locale].title)
+  // A streamed fallback is serialized in the RSC payload before hydration.
+  // Require its exact marker here, then prove the active DOM below.
+  expect(html.replaceAll('\\"', '"')).toMatch(
+    /data-testid(?:"\s*:\s*|=)"not-found"/
+  )
   expect(html).not.toContain(`${locale} ${prefix} title`)
 }
 
@@ -322,6 +332,79 @@ test("a temporary owner can log into the real admin UI and log out", async ({
   await expect(page.getByLabel(/email/i).first()).toBeVisible()
 })
 
+test("saved global drafts stay private through anonymous HTTP while published content and trusted reads work", async ({
+  request,
+  browser,
+}) => {
+  const token = await loginAPI(request, `${prefix}-editor@example.com`)
+  const anonymous = await browser.newContext({ baseURL: fixtureBaseURL })
+  try {
+    for (const [slug, field] of [
+      ["home", "heroTitle"],
+      ["header", "bookingLabel"],
+      ["footer", "address"],
+    ] as const) {
+      const published = await payload.findGlobal({
+        slug,
+        locale: "en",
+        depth: 0,
+        overrideAccess: true,
+      })
+      const draft = await payload.findGlobal({
+        slug,
+        locale: "en",
+        depth: 0,
+        draft: true,
+        overrideAccess: true,
+      })
+      const write = (data: object, draftFlag = false) =>
+        request.post(`/api/globals/${slug}?locale=en&draft=${draftFlag}`, {
+          headers: { Authorization: `JWT ${token}` },
+          data,
+        })
+      try {
+        expect(
+          (
+            await write({
+              [field]: `${prefix} published`,
+              _status: "published",
+            })
+          ).status()
+        ).toBe(200)
+        expect(
+          (
+            await write({ [field]: `${prefix} secret`, _status: "draft" }, true)
+          ).status()
+        ).toBe(200)
+        const publicRead = await anonymous.request.get(
+          `/api/globals/${slug}?locale=en&draft=false`
+        )
+        expect(publicRead.status()).toBe(200)
+        expect((await publicRead.json())[field]).toBe(`${prefix} published`)
+        const denied = await anonymous.request.get(
+          `/api/globals/${slug}?locale=en&draft=true`
+        )
+        expect(denied.status()).toBe(403)
+        expect(await denied.text()).not.toContain(`${prefix} secret`)
+        const importer = await payload.findGlobal({
+          slug,
+          locale: "en",
+          draft: true,
+          overrideAccess: true,
+        })
+        expect(importer[field as keyof typeof importer]).toBe(
+          `${prefix} secret`
+        )
+      } finally {
+        expect((await write(published)).status()).toBe(200)
+        expect((await write(draft, true)).status()).toBe(200)
+      }
+    }
+  } finally {
+    await anonymous.close()
+  }
+})
+
 test("editor changes publish and disappear through real HTTP caches in all locales", async ({
   request,
   browser,
@@ -333,10 +416,23 @@ test("editor changes publish and disappear through real HTTP caches in all local
   try {
     await expectMissingPage(await anonymous.request.get(`/en/${slug}`), "en")
     const screen = await anonymous.newPage()
-    await screen.goto(`/en/${slug}`)
-    await expect(
-      screen.getByRole("heading", { name: "404", exact: true })
-    ).toBeVisible()
+    const diagnostics: string[] = []
+    screen.on("pageerror", (error) =>
+      diagnostics.push(error.stack ?? error.message)
+    )
+    screen.on("console", (message) => {
+      if (/content.security.policy|violates.*directive/i.test(message.text()))
+        diagnostics.push(message.text())
+    })
+    for (const locale of locales) {
+      await screen.goto(`/${locale}/${slug}`)
+      await expect(
+        screen.getByTestId("not-found").getByRole("heading", {
+          name: notFoundCopy[locale].title,
+          exact: true,
+        })
+      ).toBeVisible()
+    }
     const page = await writeCMS(
       request,
       "post",
@@ -379,11 +475,29 @@ test("editor changes publish and disappear through real HTTP caches in all local
     await writeCMS(request, "patch", `/api/pages/${page.id}?locale=en`, token, {
       _status: "draft",
     })
-    for (const locale of locales)
+    for (const locale of locales) {
       await expectMissingPage(
         await anonymous.request.get(`/${locale}/${slug}`),
         locale
       )
+      await screen.goto(`/${locale}/${slug}`)
+      const boundary = screen.getByTestId("not-found")
+      await expect(
+        boundary.getByRole("heading", {
+          name: notFoundCopy[locale].title,
+          exact: true,
+        })
+      ).toBeVisible()
+      await boundary
+        .getByRole("link", {
+          name: notFoundCopy[locale].home,
+          exact: true,
+        })
+        .click()
+      await expect(screen).toHaveURL(new RegExp(`/${locale}$`))
+      await expect(screen.getByTestId("not-found")).toHaveCount(0)
+    }
+    expect(diagnostics).toEqual([])
   } finally {
     await anonymous.close()
   }
@@ -397,6 +511,28 @@ test("new uploads render after startup and revoked media disappears from cached 
   const token = await loginAPI(request, `${prefix}-editor@example.com`)
   const anonymous = await browser.newContext({ baseURL: fixtureBaseURL })
   try {
+    const invalid = await request.post("/api/media?locale=uk", {
+      headers: { Authorization: `JWT ${token}` },
+      multipart: {
+        _payload: JSON.stringify({
+          internalLabel: `${prefix}-invalid`,
+          alt: "Invalid generated fixture",
+          source: "generated",
+          replacementPriority: "none",
+        }),
+        file: {
+          name: `${prefix}-invalid.png`,
+          mimeType: "image/png",
+          buffer: await readFile("public/brand/logo-mark-grey.png"),
+        },
+      },
+    })
+    expect(invalid.status()).toBe(400)
+    expect((await invalid.json()).errors[0].data.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "replacementPriority" }),
+      ])
+    )
     let uploaded
     try {
       uploaded = await request.post("/api/media?locale=uk", {
@@ -491,9 +627,22 @@ test("new uploads render after startup and revoked media disappears from cached 
       const brandURL =
         "/_next/image?url=%2Fbrand%2Flogo-mark-grey.png&w=640&q=75"
       expect((await anonymous.request.get(brandURL)).status()).toBe(200)
-      const brandHit = await anonymous.request.get(brandURL)
-      expect(brandHit.status()).toBe(200)
-      expect(brandHit.headers()["x-nextjs-cache"]).toBe("HIT")
+      // A warm entry may be stale from an earlier run. Let the real optimizer
+      // finish its asynchronous revalidation, then require an actual cache HIT.
+      const cacheStates: string[] = []
+      await expect
+        .poll(async () => {
+          const response = await anonymous.request.get(brandURL)
+          expect(response.status()).toBe(200)
+          const cache = response.headers()["x-nextjs-cache"]
+          cacheStates.push(cache)
+          return cache
+        })
+        .toBe("HIT")
+      await test.info().attach("brand-optimizer-cache", {
+        body: JSON.stringify(cacheStates),
+        contentType: "application/json",
+      })
     }
     const deliveryURLs = new Set([
       await image.evaluate(

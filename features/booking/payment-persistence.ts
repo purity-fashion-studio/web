@@ -68,6 +68,25 @@ export async function transitionPayment({
       depth: 0,
       overrideAccess: true,
     })
+    const isRefund = ["partially-refunded", "refunded"].includes(
+      transition.status
+    )
+    if (isRefund) {
+      transition = {
+        ...transition,
+        // A refund records money movement, not an authoritative dispute resolution.
+        status:
+          order.status === "disputed"
+            ? "disputed"
+            : (order.refundedAmount ?? 0) >= order.amount
+              ? "refunded"
+              : transition.status,
+        refundedAmount: Math.max(
+          order.refundedAmount ?? 0,
+          transition.refundedAmount ?? 0
+        ),
+      }
+    }
     const canTransition = canTransitionPaymentStatus(
       order.status,
       transition.status
@@ -89,7 +108,8 @@ export async function transitionPayment({
       ]
       if (
         terminalStatuses.includes(order.status) &&
-        staleFailureStatuses.includes(transition.status)
+        (staleFailureStatuses.includes(transition.status) ||
+          transition.status === "paid")
       ) {
         return { applied: false as const, order }
       }
@@ -117,9 +137,7 @@ export async function transitionPayment({
               ...(transition.status === "paid" && statusChanged
                 ? { paidAt: now }
                 : {}),
-              ...(["partially-refunded", "refunded"].includes(transition.status)
-                ? { refundedAt: now }
-                : {}),
+              ...(isRefund && refundAdvanced ? { refundedAt: now } : {}),
             },
             overrideAccess: true,
             req,

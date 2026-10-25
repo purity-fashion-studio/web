@@ -1,3 +1,4 @@
+import { Forbidden } from "payload"
 import type {
   Access,
   FieldAccess,
@@ -60,11 +61,21 @@ export const contentOrDeveloper: Access = ({ req }) =>
 export const enforcePublishedGlobalRead: GlobalBeforeOperationHook = ({
   args,
   operation,
+  overrideAccess,
   req,
-}) =>
-  operation === "read" && !hasRole(req.user, ["owner", "editor", "developer"])
-    ? { ...args, draft: false }
-    : args
+}) => {
+  // Payload captures the draft flag before beforeOperation runs. Reject the
+  // request rather than changing args after that decision has already been made.
+  if (
+    operation === "read" &&
+    args.draft &&
+    !overrideAccess &&
+    !hasRole(req.user, ["owner", "editor", "developer"])
+  ) {
+    throw new Forbidden(req.t)
+  }
+  return args
+}
 
 export const operationsTeam: Access = ({ req }) =>
   hasRole(req.user, ["owner", "support"])

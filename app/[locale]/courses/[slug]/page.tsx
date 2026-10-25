@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { commerceLabel } from "@/content/commerce"
 import { EditorialSections } from "@/components/editorial-sections"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -133,7 +134,12 @@ export default async function CoursePage({ params }: CoursePageProps) {
           <div className="mx-auto grid max-w-6xl min-w-0 auto-rows-fr gap-4 px-6 py-16 sm:grid-cols-2 md:px-10 lg:grid-cols-3">
             {[
               [course.audienceTitle, course.audience],
-              [course.formatTitle, course.formats.join(" · ")],
+              [
+                course.formatTitle,
+                course.formats
+                  .map((format) => commerceLabel(locale, "format", format))
+                  .join(" · "),
+              ],
               [course.methodTitle, course.description],
               [
                 course.prerequisitesTitle,
@@ -213,7 +219,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
                   {course.commercialTitle}
                 </CardTitle>
                 <CardDescription className="min-w-0 break-words">
-                  {course.commercialStatus}
+                  {commerceLabel(locale, "status", course.commercialStatus)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="border-t border-border pt-5 text-sm leading-7 text-muted-foreground">

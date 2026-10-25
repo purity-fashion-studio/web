@@ -4,7 +4,6 @@ import path from "node:path"
 import { getPayload, type CollectionSlug, type Where } from "payload"
 
 import { locales, type Locale } from "../../i18n/routing"
-import { getSiteURL } from "../../lib/site-url"
 import { assertTargetResourceIdentity } from "../../scripts/resource-identity"
 import manifest from "./manifests/purity-content-manifest.v1.json"
 import {
@@ -18,6 +17,9 @@ import {
 
 const { loadEnvConfig } = nextEnv
 loadEnvConfig(process.cwd())
+
+// Environment-dependent modules must evaluate after dotenv initialization.
+const { getSiteURL } = await import("../../lib/site-url")
 
 const force = process.argv.includes("--force")
 const publish = !process.argv.includes("--draft")
@@ -33,7 +35,7 @@ const target = targetArg?.split("=")[1]
 const productionTarget = target === "production"
 const counts = new Map<string, number>()
 
-if (target === "preview" || target === "production") {
+if (target === "local" || target === "preview" || target === "production") {
   assertTargetResourceIdentity(target)
 }
 
@@ -310,16 +312,30 @@ async function upsertLocalized({
   return id
 }
 
+async function shouldPreserveGlobal(
+  slug: "home" | "header" | "footer" | "site-settings" | "booking-settings"
+) {
+  if (!productionTarget || force) return false
+  const existing = await payload.findGlobal({
+    slug,
+    depth: 0,
+    draft: true,
+    locale: "all",
+    overrideAccess: true,
+  })
+  // Empty globals may contain schema defaults but have no persisted timestamp.
+  if (!existing.updatedAt) return false
+  increment(`${slug}:skipped`)
+  return true
+}
+
 async function updateGlobalLocalized(
   slug: "home" | "header" | "footer" | "site-settings",
   common: Record<string, unknown>,
   localizedData: LocaleData,
   drafts: boolean
 ) {
-  if (productionTarget && !force) {
-    increment(`${slug}:skipped`)
-    return
-  }
+  if (await shouldPreserveGlobal(slug)) return
 
   const publicationStatus = drafts && publish ? { _status: "published" } : {}
 
@@ -955,6 +971,7 @@ async function importPortfolioCases(
 }
 
 async function importBookingSettings() {
+  if (await shouldPreserveGlobal("booking-settings")) return
   await payload.updateGlobal({
     slug: "booking-settings",
     data: {

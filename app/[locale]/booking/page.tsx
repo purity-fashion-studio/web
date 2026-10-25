@@ -230,7 +230,7 @@ export default async function BookingPage({
                         : undefined
                     }
                     initialIntent={
-                      selection?.requiresQuote
+                      query?.intent === "request" || selection?.requiresQuote
                         ? "request"
                         : requestedOfferId
                           ? "checkout"

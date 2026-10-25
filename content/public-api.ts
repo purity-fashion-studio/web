@@ -18,6 +18,7 @@ import type {
 } from "@/payload-types"
 import type { BookingPublicCopy } from "@/features/booking/public-copy"
 import type { MediaAsset } from "./media"
+import { commerceLabel, formatOfferPrice } from "./commerce"
 import { contentCacheIdentity } from "./cache-identity"
 import { resolveEditorialBlocks, type EditorialBlock } from "./editorial"
 import type { Locale } from "../i18n/routing"
@@ -1194,6 +1195,7 @@ async function findPayloadFashionCollection(
     ])
   )
 
+  const priceLabels = (await getSiteSettings(locale)).booking.pricing
   return {
     id: collection.id,
     slug: collection.slug,
@@ -1231,9 +1233,12 @@ async function findPayloadFashionCollection(
     priceNote:
       offersResult.docs.length > 0
         ? offersResult.docs
-            .map((offer) => `${offer.title}: ${offer.pricingMode}`)
+            .map(
+              (offer) =>
+                `${offer.title}: ${formatOfferPrice(offer, locale, priceLabels)}`
+            )
             .join(" · ")
-        : collection.availability,
+        : commerceLabel(locale, "status", collection.availability),
     mediaAssets: collection.gallery
       .map((id) => mediaByID.get(typeof id === "string" ? id : id.id))
       .filter((asset): asset is MediaAsset => Boolean(asset)),
@@ -1266,6 +1271,7 @@ function cachedPayloadFashionCollection(locale: Locale, slug: string) {
         "cms:media",
         "cms:editorial",
         `cms:fashion-collections:${slug}`,
+        "cms:site-settings",
       ],
     }
   )()
@@ -1354,6 +1360,7 @@ async function findPublishedPayloadFashionCollectionCards(
             fashionCollection: true,
             title: true,
             pricingMode: true,
+            prices: true,
             commercialStatus: true,
           },
           where: { fashionCollection: { in: collectionIDs } },
@@ -1362,6 +1369,7 @@ async function findPublishedPayloadFashionCollectionCards(
       : Promise.resolve({ docs: [] }),
     findReadableMediaMap(locale, mediaIDs, draft),
   ])
+  const priceLabels = (await getSiteSettings(locale)).booking.pricing
   const offersByCollectionID = new Map<
     string,
     { active: boolean; labels: string[] }
@@ -1374,7 +1382,9 @@ async function findPublishedPayloadFashionCollectionCards(
       labels: [],
     }
     current.active ||= offer.commercialStatus === "active"
-    current.labels.push(`${offer.title}: ${offer.pricingMode}`)
+    current.labels.push(
+      `${offer.title}: ${formatOfferPrice(offer, locale, priceLabels)}`
+    )
     offersByCollectionID.set(collectionID, current)
   }
 
@@ -1392,7 +1402,7 @@ async function findPublishedPayloadFashionCollectionCards(
       commercialStatus: offers?.active ? "active" : collection.availability,
       priceNote: offers?.labels.length
         ? offers.labels.join(" · ")
-        : collection.availability,
+        : commerceLabel(locale, "status", collection.availability),
       mediaAssets: firstMediaIDs
         .map((id) => mediaByID.get(id))
         .filter((asset): asset is MediaAsset => Boolean(asset)),
@@ -1408,7 +1418,12 @@ export async function getPublishedFashionCollectionCards(locale: Locale) {
     [payloadCacheNamespace, "cms", "fashion-collection-cards", locale],
     {
       revalidate: 60,
-      tags: ["cms:fashion-collections", "cms:offers", "cms:media"],
+      tags: [
+        "cms:fashion-collections",
+        "cms:offers",
+        "cms:media",
+        "cms:site-settings",
+      ],
     }
   )()
 }
@@ -2018,9 +2033,8 @@ export async function getPublishedServices(
 
 async function findPayloadDirection(
   locale: Locale,
-  value: string,
-  draft: boolean,
-  field: "slug" | "canonicalKey" = "slug"
+  slug: string,
+  draft: boolean
 ): Promise<DirectionPageData | null> {
   const payload = await getPayloadClient()
   const result = await payload.find({
@@ -2068,7 +2082,7 @@ async function findPayloadDirection(
       meta: true,
       supplementaryLayout: true,
     },
-    where: { [field]: { equals: value } },
+    where: { slug: { equals: slug } },
   })
   const direction = result.docs[0]
   if (!direction) return null
@@ -2168,31 +2182,6 @@ export async function getDirectionBySlug(locale: Locale, slug: string) {
         "cms:media",
         "cms:editorial",
         `cms:directions:${slug}`,
-      ],
-    }
-  )()
-}
-
-export async function getDirectionByCanonicalKey(
-  locale: Locale,
-  canonicalKey: string
-) {
-  const { isEnabled } = await draftMode()
-  if (isEnabled) {
-    return findPayloadDirection(locale, canonicalKey, true, "canonicalKey")
-  }
-
-  return unstable_cache(
-    () => findPayloadDirection(locale, canonicalKey, false, "canonicalKey"),
-    [payloadCacheNamespace, "cms", "direction-canonical", locale, canonicalKey],
-    {
-      revalidate: 60,
-      tags: [
-        "cms:directions",
-        "cms:services",
-        "cms:media",
-        "cms:editorial",
-        `cms:directions:canonical:${canonicalKey}`,
       ],
     }
   )()
@@ -2490,10 +2479,12 @@ export async function getPublishedPageSlugs() {
     locale: "uk",
     overrideAccess: false,
     pagination: false,
-    select: { slug: true },
+    select: { slug: true, pageType: true },
     sort: "sortOrder",
   })
-  return result.docs.map((page) => page.slug)
+  return result.docs
+    .filter((page) => page.pageType !== "service-state")
+    .map((page) => page.slug)
 }
 
 async function getDraftFlag() {

@@ -2,6 +2,25 @@ type Environment = Record<string, string | undefined>
 
 export function databaseIdentity(connectionString: string) {
   const url = new URL(connectionString)
+  if (!["postgres:", "postgresql:"].includes(url.protocol)) {
+    throw new Error("Resource identity requires a PostgreSQL connection URL.")
+  }
+  if (
+    [...url.searchParams.keys()].some((key) =>
+      [
+        "host",
+        "hostaddr",
+        "port",
+        "database",
+        "dbname",
+        "user",
+        "password",
+        "service",
+      ].includes(key.toLowerCase())
+    )
+  ) {
+    throw new Error("Connection-string identity overrides are not allowed.")
+  }
   return {
     host: url.hostname.toLowerCase(),
     name: decodeURIComponent(url.pathname.slice(1)),
@@ -13,9 +32,29 @@ export function blobStoreID(token: string) {
 }
 
 export function assertTargetResourceIdentity(
-  target: "preview" | "production",
+  target: "local" | "preview" | "production",
   environment: Environment = process.env
 ) {
+  if (target === "local") {
+    const database = environment.DATABASE_URL
+      ? new URL(environment.DATABASE_URL)
+      : undefined
+    if (
+      environment.VERCEL_ENV ||
+      environment.BLOB_READ_WRITE_TOKEN ||
+      !database ||
+      !["postgres:", "postgresql:"].includes(database.protocol) ||
+      !["localhost", "127.0.0.1", "[::1]"].includes(database.hostname) ||
+      database.search ||
+      database.hash ||
+      !database.pathname.slice(1)
+    ) {
+      throw new Error(
+        "Local CMS operations require a loopback PostgreSQL database, no deployment environment and no Blob token."
+      )
+    }
+    return
+  }
   if (environment.VERCEL_ENV !== target) {
     throw new Error(`Resource operation requires VERCEL_ENV=${target}.`)
   }

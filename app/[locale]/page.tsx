@@ -1,5 +1,6 @@
 import { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr"
 import Image from "next/image"
+import { commerceLabel } from "@/content/commerce"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -391,7 +392,7 @@ export default async function HomePage({ params }: HomePageProps) {
                     ))}
                   </ol>
                   <span className="flex items-center gap-3 px-6 text-xs tracking-[0.14em] uppercase md:px-10 lg:px-16">
-                    {course.commercialStatus}
+                    {commerceLabel(locale, "status", course.commercialStatus)}
                     <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />
                   </span>
                 </Link>

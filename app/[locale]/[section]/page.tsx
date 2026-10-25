@@ -1,12 +1,13 @@
 import type { Metadata } from "next"
+import { commerceLabel } from "@/content/commerce"
 import { notFound } from "next/navigation"
 
 import { ContentPage } from "@/components/content-page"
 import { getLocalizedMetadata } from "@/content/metadata"
 import {
-  getDirectionByCanonicalKey,
   getDirectionBySlug,
   getPageBySlug,
+  getServiceBySlug,
   getPublishedCourseCards,
   getPublishedDirections,
   getPublishedFashionCollectionCards,
@@ -18,6 +19,7 @@ import {
   toCategoryPagePresentation,
   toCategoryPresentation,
   toSpecialPagePresentation,
+  toServiceCategoryPresentation,
   type CategoryPresentation,
   type CollectionCardView,
 } from "./_types"
@@ -47,6 +49,7 @@ export async function generateMetadata({
     getDirectionBySlug(rawLocale, section),
     getPageBySlug(rawLocale, section),
   ])
+  if (publicPage?.pageType === "service-state") return {}
   const entry = publicPage ?? direction
 
   if (!entry && section === "atelier") {
@@ -88,6 +91,7 @@ export default async function SectionPage({ params }: SectionPageProps) {
     getDirectionBySlug(locale, section),
     getPageBySlug(locale, section),
   ])
+  if (publicPageData?.pageType === "service-state") notFound()
   const publicPage = publicPageData
     ? toSpecialPagePresentation(publicPageData)
     : undefined
@@ -175,16 +179,11 @@ export default async function SectionPage({ params }: SectionPageProps) {
     )
   }
 
-  const atelierServices =
-    section === "atelier"
-      ? await getPublishedServices(locale, { slugs: ["atelier-service"] })
-      : []
-  const presentationDirection =
-    directionData ??
-    (section === "atelier"
-      ? await getDirectionByCanonicalKey(locale, "realisation")
-      : null)
-  const atelierService = atelierServices[0]
+  const atelierService =
+    section === "atelier" && !directionData
+      ? await getServiceBySlug(locale, "atelier-service")
+      : null
+  const atelierServices = atelierService ? [atelierService] : []
   const category: CategoryPresentation | undefined = directionData
     ? toCategoryPresentation(directionData)
     : section === "atelier" && atelierService
@@ -226,14 +225,17 @@ export default async function SectionPage({ params }: SectionPageProps) {
     href: localizePath(locale, servicePath(service.routeSegment)),
     title: service.title,
     summary: service.summary,
-    status: presentationDirection?.narrative ?? service.summary,
-    priceNote: presentationDirection?.outcomes.join(" · ") ?? "",
+    status: directionData?.narrative ?? service.summary,
+    priceNote:
+      directionData?.outcomes.join(" · ") ??
+      atelierService?.outcomes.join(" · ") ??
+      "",
   }))
   const courseEntries = payloadCourses.map((course) => ({
     href: localizePath(locale, coursePath(course.routeSegment)),
     title: course.title,
     summary: course.summary,
-    status: course.commercialStatus,
+    status: commerceLabel(locale, "status", course.commercialStatus),
     priceNote: course.priceNote,
   }))
   const collectionCards: CollectionCardView[] = payloadCollections.map(
@@ -266,15 +268,20 @@ export default async function SectionPage({ params }: SectionPageProps) {
     category.slug === "corporate" ||
     category.slug === "school"
   ) {
-    if (!presentationDirection) notFound()
+    const copy = directionData
+      ? toCategoryPagePresentation(directionData)
+      : atelierService
+        ? toServiceCategoryPresentation(atelierService)
+        : null
+    if (!copy) notFound()
     return (
       <OfferCategoryPageView
         locale={locale}
         category={category}
         entries={[...serviceEntries, ...courseEntries]}
         mediaAsset={categoryMediaAsset}
-        copy={toCategoryPagePresentation(presentationDirection)}
-        ctaLabel={presentationDirection.ctaLabel}
+        copy={copy}
+        ctaLabel={directionData?.ctaLabel ?? atelierService!.cta.label}
       />
     )
   }

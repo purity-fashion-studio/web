@@ -17,14 +17,29 @@ export async function SiteHeader({
     getHeader(locale),
     getSiteSettings(locale),
   ])
+  const maintenanceMessage = settingsData.maintenance.enabled
+    ? settingsData.maintenance.message?.trim()
+    : undefined
   return (
-    <SiteHeaderClient
-      locale={locale}
-      currentPath={currentPath}
-      overlay={overlay}
-      headerData={headerData}
-      settingsData={settingsData}
-    />
+    <>
+      <SiteHeaderClient
+        locale={locale}
+        currentPath={currentPath}
+        overlay={maintenanceMessage ? false : overlay}
+        headerData={headerData}
+        settingsData={settingsData}
+      />
+      {maintenanceMessage && (
+        <aside
+          role="status"
+          className="relative border-b border-border bg-muted px-6 pt-24 pb-5 text-sm leading-7 text-foreground md:px-10"
+        >
+          <p className="mx-auto max-w-screen-xl break-words whitespace-pre-line">
+            {maintenanceMessage}
+          </p>
+        </aside>
+      )}
+    </>
   )
 }
 

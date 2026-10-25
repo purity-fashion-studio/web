@@ -24,6 +24,10 @@ version. Payment Orders retain an immutable offer snapshot.
 - finance: payment orders and webhook audit only;
 - developer: schema-oriented non-production access, not production PII.
 
+Notification Outbox metadata is visible to owner/support/finance; recipient
+addresses are owner-only. Developer accounts cannot read outbox records in any
+environment. Use synthetic fixtures for schema diagnostics.
+
 Disabled users are rejected at login, API keys are disabled, login attempts are
 limited, sessions expire, and passwords must contain at least 14 characters.
 Trusted Local API bypasses are limited to named booking/webhook/import contexts.
@@ -44,7 +48,13 @@ ALLOW_CMS_SEED=true pnpm cms:bootstrap -- --target=preview --confirm=BOOTSTRAP_P
 The bootstrap importer writes in relationship order and refuses any non-empty
 database. A restore is a separate, explicitly confirmed operation. Migration
 files and `payload-types.ts` are committed; schema push is limited to isolated
-development.
+development. Local imports additionally require a loopback PostgreSQL target,
+no deployment environment and no Blob token. Local connection strings cannot
+contain query/fragment overrides; remote identity checks also reject parameters
+that can redirect the driver to another resource while allowing ordinary TLS
+options. Dotenv is loaded before runtime
+configuration is evaluated. Bootstrap initializes missing localized globals
+without granting permission to overwrite existing production globals.
 
 Vercel builds verify the manifest and build the application only. Migrations,
 bootstrap, restore and Preview reset are manual release operations serialized by
@@ -54,7 +64,9 @@ identity matches before the first destructive call.
 ## Publish, preview and cache
 
 Drafts, autosave, versions, scheduled publish support, restore, preview and
-Live Preview are configured. Draft Mode uses a 32+ character secret, an
+Live Preview are configured. Due scheduled publish/unpublish jobs are drained
+by the authenticated daily operations cron; see the runbook for timing and
+batch limits. Draft Mode uses a 32+ character secret, an
 allowlisted localized path and open-redirect protection. Breakpoints are
 390×844, 768×1024 and 1440×900. Public queries use locale, no fallback, selected
 fields, bounded depth and public access. Cache tags and route invalidation run

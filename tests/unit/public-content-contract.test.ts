@@ -18,6 +18,7 @@ import {
   getPublishedPortfolioCases,
   getPublishedServices,
   getHomeSelections,
+  getPublishedPageSlugs,
 } from "@/content/public-api"
 
 beforeEach(() => {
@@ -39,6 +40,16 @@ beforeEach(() => {
   state.findByID.mockRejectedValue(
     new Error("The requested direction is not readable")
   )
+})
+
+it("excludes payment templates from public page discovery", async () => {
+  state.find.mockResolvedValue({
+    docs: [
+      { slug: "studio", pageType: "studio" },
+      { slug: "payment-success", pageType: "service-state" },
+    ],
+  })
+  expect(await getPublishedPageSlugs()).toEqual(["studio"])
 })
 
 it("treats an unpublished parent direction as unavailable instead of throwing", async () => {

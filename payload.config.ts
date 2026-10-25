@@ -1,6 +1,5 @@
 import { postgresAdapter } from "@payloadcms/db-postgres"
 import { resendAdapter } from "@payloadcms/email-resend"
-import { lexicalEditor } from "@payloadcms/richtext-lexical"
 import { redirectsPlugin } from "@payloadcms/plugin-redirects"
 import { seoPlugin } from "@payloadcms/plugin-seo"
 import { vercelBlobStorage } from "@payloadcms/storage-vercel-blob"
@@ -154,7 +153,6 @@ export default buildConfig({
         new URL(databaseURL).hostname
       ),
   }),
-  editor: lexicalEditor(),
   email:
     env.EMAIL_MODE === "offline" || env.EMAIL_MODE === "disabled"
       ? () => ({
@@ -183,6 +181,8 @@ export default buildConfig({
               : env.EMAIL_OVERRIDE_RECIPIENT,
         }),
   graphQL: { disable: true },
+  // Run jobs only through the bearer-authenticated, bounded operations endpoint.
+  jobs: { access: { run: () => false } },
   globals: [Home, Header, Footer, SiteSettings, BookingSettings],
   localization: {
     defaultLocale: "uk",

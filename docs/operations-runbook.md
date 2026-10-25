@@ -7,7 +7,9 @@ Readiness returns `503` when migrations, required published content or its
 public media probe is unavailable. Check application errors, managed PostgreSQL, storage,
 Resend and provider status pages without logging secrets, raw webhooks, form
 messages or client PII. Site Settings can publish a localized maintenance
-message; payment/booking writes must fail closed rather than pretend success.
+message in the shared public header. This notice is informational: it does not
+disable forms or change payment/booking eligibility. Those operations retain
+their own fail-closed validation and persistence checks.
 
 ## Backup and restore
 
@@ -48,7 +50,10 @@ Provider endpoints retry safely through provider-scoped Webhook Events. A
 `failed`/`retryable` event is claimable again and records attempts, next retry
 and a sanitized error. Investigate by payload hash, correlation ID, safe error,
 order UUID and provider dashboard; do not paste raw payloads into tickets.
-Finance never edits `paid` manually.
+Finance never edits `paid` manually. Generic checkout success cannot clear an
+existing dispute, even when delivered late. Dispute resolution requires review
+of the authoritative provider record; a close event alone is not treated as
+proof of payment.
 Refund actions require owner/finance authorization, reason, amount, provider
 reference and policy evidence. Reconcile pending orders and provider totals on
 an agreed schedule; escalate amount/currency mismatches immediately. The
@@ -57,6 +62,33 @@ uses per-order locks, so concurrent invocations do not double-process one
 order. Vercel invokes the recovery job daily; merchant activation must provide
 a more frequent external schedule when the chosen Vercel plan cannot run the
 required interval.
+
+## Scheduled publishing
+
+The existing Vercel cron for `/api/jobs/process-notifications` also runs due
+Payload `schedulePublish` tasks, including scheduled unpublishing. It processes
+at most ten jobs sequentially per invocation in the default queue, under a
+non-overlapping PostgreSQL advisory lock and a 60-second function limit. It claims
+one job at a time and stops new claims after a 45-second cooperative budget; a
+slow task can still reach the platform limit. After a terminated invocation, the
+next exclusive pass reclaims up to ten unfinished claims before running them.
+Publishing is at-least-once: an interrupted publication may replay normal content
+hooks. Busy passes do not recover or change a live worker's claims. The response
+reports processed, failed, recovered, due remaining and budget-exhausted counts. Other
+tasks and query-supplied batch/queue overrides are not accepted. The generic
+Payload run endpoint is disabled; manual runs use this same bounded endpoint.
+The task restores
+the scheduling user's permissions and uses normal content hooks for invalidation.
+Failed task counts return `503` and are logged without job inputs; inspect failed
+jobs in Payload and re-schedule after correcting permissions or invalid content.
+
+The committed Vercel schedule runs daily. Publication occurs on the first
+successful due-job pass, not at the exact time entered in Admin; a backlog above
+ten jobs needs additional passes. For tighter timing, configure an approved
+external scheduler using the same bearer-authenticated endpoint, or move to a
+Vercel plan that supports the required cron frequency. Do not promise minute-level
+publishing on a daily schedule. Manual authenticated invocations use the same
+bounds. Safe-preview mail remains disabled independently of content publishing.
 
 ## Email operations
 
